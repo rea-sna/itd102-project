@@ -12,6 +12,9 @@ import math
 import io
 import csv
 import zipfile
+import subprocess
+import platform
+import os
 import requests
 from datetime import datetime
 
@@ -43,6 +46,19 @@ STATUS_BG  = "#05090e"
 
 GTFS_RT_URL     = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/tripupdates"
 GTFS_STATIC_URL = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip"
+
+_SOUND_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sound.mp3")
+
+def _play_sound():
+    def _play():
+        try:
+            if platform.system() == "Darwin":
+                subprocess.run(["afplay", _SOUND_FILE], check=False)
+            else:
+                subprocess.run(["mpg123", "-q", _SOUND_FILE], check=False)
+        except Exception as e:
+            print(f"[SOUND] {e}")
+    threading.Thread(target=_play, daemon=True).start()
 
 # ── Static GTFS ───────────────────────────────────────────────────────────────
 _static = {"route_name": {}, "headsign": {}, "loaded": False}
@@ -141,6 +157,7 @@ class SignageApp(tk.Tk):
         self.bind("q",        lambda _: self.destroy())
 
         self._blink_on = True
+        self._alerted  = set()   # arrival_ts values that already triggered sound
         self._p1_refs      = []   # [(dep_dict, arriving_label, row_widgets)]
         self._p2_refs      = []
         self._p1_row_cache = []   # [(cell, badge_lbl, dest_lbl, sched_lbl, arr_lbl, sep)]
@@ -166,9 +183,6 @@ class SignageApp(tk.Tk):
         left.pack(side="left", padx=28, pady=14)
         tk.Label(left, text=LOCATION_NAME,
                  bg=HEADER_BG, fg=TEXT, font=("Helvetica", 38, "bold"),
-                 anchor="w").pack(anchor="w")
-        tk.Label(left, text="Real-Time Departures — TransLink SEQ",
-                 bg=HEADER_BG, fg="#7ba4d4", font=("Helvetica", 18),
                  anchor="w").pack(anchor="w")
 
         self.clock_lbl = tk.Label(hdr, text="--:--:--",
@@ -278,6 +292,15 @@ class SignageApp(tk.Tk):
                     text=text,
                     fg=color if not (blink_text and not self._blink_on) else BG,
                 )
+
+        # 1分前アラート: 各バスにつき1回だけ再生
+        for dep in _cache["p1"] + _cache["p2"]:
+            diff = dep["arrival_ts"] - now_ts
+            if 0 < diff <= 60 and dep["arrival_ts"] not in self._alerted:
+                self._alerted.add(dep["arrival_ts"])
+                _play_sound()
+        # 過去の記録を掃除
+        self._alerted = {ts for ts in self._alerted if ts > now_ts - 180}
 
         self.after(self.TICK_MS, self._tick)
 

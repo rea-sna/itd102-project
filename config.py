@@ -2,8 +2,8 @@
 PLATFORM_1_STOP_IDS = {"884"}   # Platform 1 — outbound
 PLATFORM_2_STOP_IDS = {"889"}   # Platform 2 — inbound
 
-PLATFORM_1_LABEL = "Platform 1 - Herston, RBWH, Carseldine, Chermside, Bracken Ridge"
-PLATFORM_2_LABEL = "Platform 2 - Normanby, Roma Street, Queen Street, Woolloongabba, UQ Lakes"
+PLATFORM_1_LABEL = "Platform 1 - RBWH, Carseldine, Chermside, Bracken Ridge"
+PLATFORM_2_LABEL = "Platform 2 - Roma Street, City, Woolloongabba, UQ Lakes"
 
 # app.py 後方互換
 STOP_IDS = PLATFORM_1_STOP_IDS | PLATFORM_2_STOP_IDS
