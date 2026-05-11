@@ -141,8 +141,10 @@ class SignageApp(tk.Tk):
         self.bind("q",        lambda _: self.destroy())
 
         self._blink_on = True
-        self._p1_refs  = []   # [(dep_dict, arriving_label)]
-        self._p2_refs  = []
+        self._p1_refs      = []   # [(dep_dict, arriving_label, row_widgets)]
+        self._p2_refs      = []
+        self._p1_row_cache = []   # [(cell, badge_lbl, dest_lbl, sched_lbl, arr_lbl, sep)]
+        self._p2_row_cache = []
 
         self._build_ui()
         self._tick()
@@ -187,11 +189,11 @@ class SignageApp(tk.Tk):
         outer.rowconfigure(0, weight=1)
 
         # Left panel — no extra border
-        self._p1_tbl = self._make_panel(outer, grid_col=0,
-                                        label=PLATFORM_1_LABEL, left_border=False)
+        self._p1_tbl, self._p1_no_svc = self._make_panel(
+            outer, grid_col=0, label=PLATFORM_1_LABEL, left_border=False)
         # Right panel — 3 px ACCENT left border to act as the centre divider
-        self._p2_tbl = self._make_panel(outer, grid_col=1,
-                                        label=PLATFORM_2_LABEL, left_border=True)
+        self._p2_tbl, self._p2_no_svc = self._make_panel(
+            outer, grid_col=1, label=PLATFORM_2_LABEL, left_border=True)
 
     def _make_panel(self, outer: tk.Frame, grid_col: int,
                     label: str, left_border: bool) -> tk.Frame:
@@ -238,12 +240,12 @@ class SignageApp(tk.Tk):
         tk.Frame(panel, bg=BORDER, height=1).grid(
             row=2, column=0, columnspan=4, sticky="ew")
 
-        # row 3 — loading placeholder
-        tk.Label(panel, text="Loading…",
-                 bg=BG, fg=MUTED, font=("Helvetica", 28)
-                 ).grid(row=3, column=0, columnspan=4, pady=50)
+        # row 3 — loading/no-service placeholder (kept alive; shown/hidden as needed)
+        no_svc = tk.Label(panel, text="Loading…",
+                          bg=BG, fg=MUTED, font=("Helvetica", 28))
+        no_svc.grid(row=3, column=0, columnspan=4, pady=50)
 
-        return panel
+        return panel, no_svc
 
     def _build_status_bar(self):
         sb = tk.Frame(self, bg=STATUS_BG, height=40)
@@ -282,60 +284,85 @@ class SignageApp(tk.Tk):
     # ── Table render ──────────────────────────────────────────────────────────
 
     def _render(self):
-        self._render_panel(self._p1_tbl, _cache["p1"], self._p1_refs)
-        self._render_panel(self._p2_tbl, _cache["p2"], self._p2_refs)
+        self._render_panel(self._p1_tbl, _cache["p1"], self._p1_refs,
+                           self._p1_row_cache, self._p1_no_svc)
+        self._render_panel(self._p2_tbl, _cache["p2"], self._p2_refs,
+                           self._p2_row_cache, self._p2_no_svc)
 
-    def _render_panel(self, panel: tk.Frame, deps: list, refs: list):
-        # Clear data rows (>= 3); keep banner (0), headers (1), separator (2)
-        for w in panel.grid_slaves():
-            if int(w.grid_info()["row"]) >= 3:
-                w.destroy()
+    def _render_panel(self, panel: tk.Frame, deps: list, refs: list,
+                      row_cache: list, no_svc_lbl: tk.Label):
         refs.clear()
-
         now_ts = int(time.time())
 
         if not deps:
-            tk.Label(panel, text="No upcoming services",
-                     bg=BG, fg=MUTED, font=("Helvetica", 28)
-                     ).grid(row=3, column=0, columnspan=4, pady=50)
+            # Hide all cached rows without destroying them
+            for entry in row_cache:
+                for w in entry:
+                    w.grid_remove()
+            no_svc_lbl.config(text="No upcoming services")
+            no_svc_lbl.grid(row=3, column=0, columnspan=4, pady=50)
             return
+
+        # Hide the no-service label
+        no_svc_lbl.grid_remove()
 
         for i, dep in enumerate(deps):
             data_row = i * 2 + 3    # 3, 5, 7, …
             sep_row  = data_row + 1
 
-            # ── Route badge ───────────────────────────────────────────────
-            cell = tk.Frame(panel, bg=BG, padx=18, pady=14)
-            cell.grid(row=data_row, column=0, sticky="nsew")
-            tk.Label(cell, text=dep["route"],
-                     bg=ACCENT, fg="white", font=("Helvetica", 28, "bold"),
-                     padx=14, pady=6).pack()
+            if i < len(row_cache):
+                # ── Update existing row in-place (no flicker) ─────────────
+                cell, badge_lbl, dest_lbl, sched_lbl, arr_lbl, sep = row_cache[i]
+                cell.grid(row=data_row, column=0, sticky="nsew")
+                dest_lbl.grid(row=data_row, column=1, sticky="ew")
+                sched_lbl.grid(row=data_row, column=2, sticky="ew")
+                arr_lbl.grid(row=data_row, column=3, sticky="ew")
+                sep.grid(row=sep_row, column=0, columnspan=4, sticky="ew")
+                badge_lbl.config(text=dep["route"])
+                dest_lbl.config(text=dep.get("headsign") or "—")
+                sched_lbl.config(text=dep["scheduled"])
+                text, color, _ = _fmt_arrival(dep["arrival_ts"], now_ts)
+                arr_lbl.config(text=text, fg=color)
+            else:
+                # ── Create a new row ──────────────────────────────────────
+                cell = tk.Frame(panel, bg=BG, padx=18, pady=14)
+                cell.grid(row=data_row, column=0, sticky="nsew")
+                badge_lbl = tk.Label(cell, text=dep["route"],
+                                     bg=ACCENT, fg="white", font=("Helvetica", 28, "bold"),
+                                     padx=14, pady=6)
+                badge_lbl.pack()
 
-            # ── Destination ───────────────────────────────────────────────
-            dest_lbl = tk.Label(panel, text=dep.get("headsign") or "—",
-                                bg=BG, fg=TEXT, font=("Helvetica", 32),
-                                anchor="w", padx=18, pady=14)
-            dest_lbl.grid(row=data_row, column=1, sticky="ew")
+                dest_lbl = tk.Label(panel, text=dep.get("headsign") or "—",
+                                    bg=BG, fg=TEXT, font=("Helvetica", 32),
+                                    anchor="w", padx=18, pady=14)
+                dest_lbl.grid(row=data_row, column=1, sticky="ew")
 
-            # ── Scheduled ─────────────────────────────────────────────────
-            sched_lbl = tk.Label(panel, text=dep["scheduled"],
-                                 bg=BG, fg=TEXT, font=("Helvetica", 28),
-                                 anchor="w", padx=18)
-            sched_lbl.grid(row=data_row, column=2, sticky="ew")
+                sched_lbl = tk.Label(panel, text=dep["scheduled"],
+                                     bg=BG, fg=TEXT, font=("Helvetica", 28),
+                                     anchor="w", padx=18)
+                sched_lbl.grid(row=data_row, column=2, sticky="ew")
 
-            # ── Arriving countdown ────────────────────────────────────────
-            text, color, blink = _fmt_arrival(dep["arrival_ts"], now_ts)
-            arr_lbl = tk.Label(panel, text=text,
-                               bg=BG, fg=color, font=("Helvetica", 36, "bold"),
-                               anchor="e", padx=18)
-            arr_lbl.grid(row=data_row, column=3, sticky="ew")
+                text, color, _ = _fmt_arrival(dep["arrival_ts"], now_ts)
+                arr_lbl = tk.Label(panel, text=text,
+                                   bg=BG, fg=color, font=("Helvetica", 36, "bold"),
+                                   anchor="e", padx=18)
+                arr_lbl.grid(row=data_row, column=3, sticky="ew")
 
-            # cell・各 Label を refs に保存（行背景の点滅に使う）
+                sep = tk.Frame(panel, bg=BORDER, height=1)
+                sep.grid(row=sep_row, column=0, columnspan=4, sticky="ew")
+
+                row_cache.append((cell, badge_lbl, dest_lbl, sched_lbl, arr_lbl, sep))
+
             refs.append((dep, arr_lbl, [cell, dest_lbl, sched_lbl, arr_lbl]))
 
-            # ── Row separator ─────────────────────────────────────────────
-            tk.Frame(panel, bg=BORDER, height=1).grid(
-                row=sep_row, column=0, columnspan=4, sticky="ew")
+        # Destroy rows that are no longer needed
+        while len(row_cache) > len(deps):
+            cell, badge_lbl, dest_lbl, sched_lbl, arr_lbl, sep = row_cache.pop()
+            cell.destroy()
+            dest_lbl.destroy()
+            sched_lbl.destroy()
+            arr_lbl.destroy()
+            sep.destroy()
 
     # ── Background fetch ──────────────────────────────────────────────────────
 
