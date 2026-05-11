@@ -6,6 +6,7 @@ Exact 50/50 split via columnconfigure uniform group.
 """
 
 import tkinter as tk
+import tkinter.font as tkfont
 import threading
 import time
 import math
@@ -15,8 +16,16 @@ import zipfile
 import subprocess
 import platform
 import os
+import tempfile
 import requests
 from datetime import datetime
+
+try:
+    from google.cloud import texttospeech as _tts_lib
+    _TTS_OK = True
+except ImportError:
+    _TTS_OK = False
+    print("[WARN] google-cloud-texttospeech not installed. Run: pip install google-cloud-texttospeech")
 
 from config import (
     PLATFORM_1_STOP_IDS, PLATFORM_2_STOP_IDS,
@@ -44,6 +53,123 @@ BORDER     = "#1a2030"
 TABLE_HEAD = "#0d1520"
 STATUS_BG  = "#05090e"
 
+# ── Scrolling label ───────────────────────────────────────────────────────────
+
+class ScrollingLabel(tk.Canvas):
+    """Canvas-based label that marquee-scrolls text when it overflows."""
+    _SPEED    = 2    # px per tick
+    _PAUSE    = 60   # ticks held at each end (~2.4 s at 40 ms/tick)
+    _INTERVAL = 40   # ms per tick
+
+    def __init__(self, parent, text="", font=None, fg=TEXT, bg=BG,
+                 padx=18, pady=14, **kwargs):
+        super().__init__(parent, bg=bg, highlightthickness=0, bd=0, **kwargs)
+        self._text_str  = text
+        self._font_spec = font
+        self._fg        = fg
+        self._padx      = padx
+        self._pady      = pady
+        self._tid       = None   # canvas text item id
+        self._aid       = None   # after() id
+        self._offset    = 0
+        self._state     = "PAUSE_START"
+        self._pause_ctr = 0
+        self._text_w    = 0
+        self.bind("<Configure>", lambda e: self._on_configure())
+
+    def _on_configure(self):
+        if self._aid:
+            self.after_cancel(self._aid)
+            self._aid = None
+        self._reset_and_draw()
+
+    def _reset_and_draw(self):
+        self.delete("all")
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w < 2 or h < 2:
+            self.after(50, self._reset_and_draw)
+            return
+        f = tkfont.Font(font=self._font_spec)
+        self._text_w = f.measure(self._text_str)
+        y = h // 2
+        self._tid = self.create_text(
+            self._padx, y,
+            text=self._text_str,
+            font=self._font_spec,
+            fill=self._fg,
+            anchor="w",
+        )
+        self._offset    = 0
+        self._state     = "PAUSE_START"
+        self._pause_ctr = self._PAUSE
+        if self._text_w > w - 2 * self._padx:
+            self._aid = self.after(self._INTERVAL, self._step)
+
+    def _step(self):
+        self._aid = None
+        try:
+            w = self.winfo_width()
+            h = self.winfo_height()
+        except tk.TclError:
+            return
+        avail = w - 2 * self._padx
+
+        if self._state == "PAUSE_START":
+            self._pause_ctr -= 1
+            if self._pause_ctr <= 0:
+                self._state = "SCROLLING"
+
+        elif self._state == "SCROLLING":
+            self._offset += self._SPEED
+            max_off = max(0, self._text_w - avail)
+            if self._offset >= max_off:
+                self._offset   = max_off
+                self._state    = "PAUSE_END"
+                self._pause_ctr = self._PAUSE
+            self.coords(self._tid, self._padx - self._offset, h // 2)
+
+        elif self._state == "PAUSE_END":
+            self._pause_ctr -= 1
+            if self._pause_ctr <= 0:
+                self._offset    = 0
+                self._state     = "PAUSE_START"
+                self._pause_ctr = self._PAUSE
+                self.coords(self._tid, self._padx, h // 2)
+
+        self._aid = self.after(self._INTERVAL, self._step)
+
+    def config(self, **kwargs):
+        redraw = False
+        if "text" in kwargs:
+            self._text_str = kwargs.pop("text")
+            redraw = True
+        if "fg" in kwargs:
+            self._fg = kwargs.pop("fg")
+            if self._tid:
+                self.itemconfig(self._tid, fill=self._fg)
+        if "bg" in kwargs:
+            super().config(bg=kwargs.pop("bg"))
+        if kwargs:
+            super().config(**kwargs)
+        if redraw:
+            if self._aid:
+                self.after_cancel(self._aid)
+                self._aid = None
+            self._reset_and_draw()
+
+    configure = config
+
+    def destroy(self):
+        if self._aid:
+            try:
+                self.after_cancel(self._aid)
+            except Exception:
+                pass
+            self._aid = None
+        super().destroy()
+
+
 GTFS_RT_URL     = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/tripupdates"
 GTFS_STATIC_URL = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip"
 
@@ -59,6 +185,66 @@ def _play_sound():
         except Exception as e:
             print(f"[SOUND] {e}")
     threading.Thread(target=_play, daemon=True).start()
+
+
+_tts_client = None
+
+def _get_tts_client():
+    global _tts_client
+    if _tts_client is None:
+        _tts_client = _tts_lib.TextToSpeechClient()
+    return _tts_client
+
+
+def _announce(dep: dict):
+    """Play chime then speak the bus route and destination via Cloud TTS."""
+    route    = dep["route"]
+    headsign = dep.get("headsign") or ""
+    if headsign:
+        speech_text = f"Bus {route} to {headsign}, arriving in 1 minute."
+    else:
+        speech_text = f"Bus {route}, arriving in 1 minute."
+
+    def _run():
+        # 1. Chime
+        try:
+            if platform.system() == "Darwin":
+                subprocess.run(["afplay", _SOUND_FILE], check=False)
+            else:
+                subprocess.run(["mpg123", "-q", _SOUND_FILE], check=False)
+        except Exception as e:
+            print(f"[SOUND] {e}")
+
+        # 2. TTS announcement
+        if not _TTS_OK:
+            return
+        try:
+            client = _get_tts_client()
+            response = client.synthesize_speech(
+                input=_tts_lib.SynthesisInput(text=speech_text),
+                voice=_tts_lib.VoiceSelectionParams(
+                    language_code="en-AU",
+                    name="en-AU-Neural2-D",
+                ),
+                audio_config=_tts_lib.AudioConfig(
+                    audio_encoding=_tts_lib.AudioEncoding.MP3,
+                    speaking_rate=0.95,
+                ),
+            )
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                f.write(response.audio_content)
+                tmp_path = f.name
+            try:
+                if platform.system() == "Darwin":
+                    subprocess.run(["afplay", tmp_path], check=False)
+                else:
+                    subprocess.run(["mpg123", "-q", tmp_path], check=False)
+            finally:
+                os.unlink(tmp_path)
+        except Exception as e:
+            print(f"[TTS] {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
 
 # ── Static GTFS ───────────────────────────────────────────────────────────────
 _static = {"route_name": {}, "headsign": {}, "loaded": False}
@@ -302,7 +488,7 @@ class SignageApp(tk.Tk):
             diff = dep["arrival_ts"] - now_ts
             if 0 < diff <= 60 and dep["arrival_ts"] not in self._alerted:
                 self._alerted.add(dep["arrival_ts"])
-                _play_sound()
+                _announce(dep)
         # 過去の記録を掃除
         self._alerted = {ts for ts in self._alerted if ts > now_ts - 180}
 
@@ -359,9 +545,9 @@ class SignageApp(tk.Tk):
                                      padx=14, pady=6)
                 badge_lbl.pack()
 
-                dest_lbl = tk.Label(panel, text=dep.get("headsign") or "—",
-                                    bg=BG, fg=TEXT, font=("Helvetica", 32),
-                                    anchor="w", padx=18, pady=14)
+                dest_lbl = ScrollingLabel(panel, text=dep.get("headsign") or "—",
+                                         font=("Helvetica", 32),
+                                         fg=TEXT, bg=BG, padx=18, pady=14)
                 dest_lbl.grid(row=data_row, column=1, sticky="nsew")
 
                 sched_lbl = tk.Label(panel, text=dep["scheduled"],
