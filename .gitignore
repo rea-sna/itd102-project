@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+*.so
+
+# 仮想環境
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ログ・一時ファイル
+*.log
+*.tmp
+
+# 環境変数・秘密情報
+.env
+.env.*
+secrets.py
