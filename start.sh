@@ -12,6 +12,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# RPi でデスクトップ外から起動する場合に必要
+export DISPLAY="${DISPLAY:-:0}"
+
 # 仮想環境がなければ作成
 if [ ! -d "venv" ]; then
   echo "仮想環境を作成中..."
@@ -20,16 +23,6 @@ if [ ! -d "venv" ]; then
   venv/bin/pip install -r requirements.txt
 fi
 
-# Flask サーバーをバックグラウンドで起動
-echo "Flask サーバーを起動中..."
-venv/bin/python app.py &
-FLASK_PID=$!
-
-# サーバーが起動するまで待機
-sleep 3
-
-# surf をフルスクリーンで起動
-surf -F http://localhost:5000
-
-# surf 終了後に Flask を停止
-kill $FLASK_PID 2>/dev/null || true
+# ネイティブ Tkinter アプリを起動
+echo "TransLink サイネージを起動中..."
+exec venv/bin/python native.py
