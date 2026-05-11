@@ -338,11 +338,25 @@ class SignageApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{LOCATION_NAME} — Departures")
-        self.configure(bg=BG)
-        self.attributes("-fullscreen", True)
-        self.bind("<Escape>", lambda _: self.attributes("-fullscreen", False))
-        self.bind("<F11>",    lambda _: self.attributes("-fullscreen", True))
-        self.bind("q",        lambda _: self.destroy())
+        self.configure(bg=BG, cursor="none")
+
+        # キオスクモード: ウィンドウマネージャのボタンで閉じられないようにする
+        self.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        if platform.system() == "Linux":
+            # RPi/X11: overrideredirect でタイトルバーを除去し画面全体に張る
+            self.overrideredirect(True)
+            self.attributes("-topmost", True)
+            self.after(50, self._go_fullscreen)
+        else:
+            # macOS: ネイティブフルスクリーン
+            self.attributes("-fullscreen", True)
+            self.attributes("-topmost", True)
+
+        # 終了: Ctrl+Q (開発者用)、フルスクリーン解除: F11
+        self.bind("<Control-q>", lambda _: self.destroy())
+        self.bind("<F11>", lambda _: self.attributes(
+            "-fullscreen", not self.attributes("-fullscreen")))
 
         self._blink_on = True
         self._alerted  = set()   # arrival_ts values that already triggered sound
@@ -354,6 +368,12 @@ class SignageApp(tk.Tk):
         self._build_ui()
         self._tick()
         self._do_fetch()
+
+    def _go_fullscreen(self):
+        """Linux/X11 用: スクリーンサイズを取得してジオメトリを設定する。"""
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        self.geometry(f"{sw}x{sh}+0+0")
 
     # ── Layout ────────────────────────────────────────────────────────────────
 
