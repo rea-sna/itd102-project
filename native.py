@@ -259,6 +259,10 @@ class SignageApp(tk.Tk):
                           bg=BG, fg=MUTED, font=("Helvetica", 28))
         no_svc.grid(row=3, column=0, columnspan=4, pady=50)
 
+        # Fix row heights: always divide space into MAX_PER_PLATFORM equal slots
+        for i in range(MAX_PER_PLATFORM):
+            panel.rowconfigure(i * 2 + 3, weight=1)
+
         return panel, no_svc
 
     def _build_status_bar(self):
@@ -337,9 +341,9 @@ class SignageApp(tk.Tk):
                 # ── Update existing row in-place (no flicker) ─────────────
                 cell, badge_lbl, dest_lbl, sched_lbl, arr_lbl, sep = row_cache[i]
                 cell.grid(row=data_row, column=0, sticky="nsew")
-                dest_lbl.grid(row=data_row, column=1, sticky="ew")
-                sched_lbl.grid(row=data_row, column=2, sticky="ew")
-                arr_lbl.grid(row=data_row, column=3, sticky="ew")
+                dest_lbl.grid(row=data_row, column=1, sticky="nsew")
+                sched_lbl.grid(row=data_row, column=2, sticky="nsew")
+                arr_lbl.grid(row=data_row, column=3, sticky="nsew")
                 sep.grid(row=sep_row, column=0, columnspan=4, sticky="ew")
                 badge_lbl.config(text=dep["route"])
                 dest_lbl.config(text=dep.get("headsign") or "—")
@@ -358,18 +362,18 @@ class SignageApp(tk.Tk):
                 dest_lbl = tk.Label(panel, text=dep.get("headsign") or "—",
                                     bg=BG, fg=TEXT, font=("Helvetica", 32),
                                     anchor="w", padx=18, pady=14)
-                dest_lbl.grid(row=data_row, column=1, sticky="ew")
+                dest_lbl.grid(row=data_row, column=1, sticky="nsew")
 
                 sched_lbl = tk.Label(panel, text=dep["scheduled"],
                                      bg=BG, fg=TEXT, font=("Helvetica", 28),
                                      anchor="w", padx=18)
-                sched_lbl.grid(row=data_row, column=2, sticky="ew")
+                sched_lbl.grid(row=data_row, column=2, sticky="nsew")
 
                 text, color, _ = _fmt_arrival(dep["arrival_ts"], now_ts)
                 arr_lbl = tk.Label(panel, text=text,
                                    bg=BG, fg=color, font=("Helvetica", 36, "bold"),
                                    anchor="e", padx=18)
-                arr_lbl.grid(row=data_row, column=3, sticky="ew")
+                arr_lbl.grid(row=data_row, column=3, sticky="nsew")
 
                 sep = tk.Frame(panel, bg=BORDER, height=1)
                 sep.grid(row=sep_row, column=0, columnspan=4, sticky="ew")
@@ -386,6 +390,7 @@ class SignageApp(tk.Tk):
             sched_lbl.destroy()
             arr_lbl.destroy()
             sep.destroy()
+
 
     # ── Background fetch ──────────────────────────────────────────────────────
 

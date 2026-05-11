@@ -9,7 +9,7 @@ PLATFORM_2_LABEL = "Platform 2 - Roma Street, City, Woolloongabba, UQ Lakes"
 STOP_IDS = PLATFORM_1_STOP_IDS | PLATFORM_2_STOP_IDS
 
 # プラットフォームごとの最大表示件数 (native.py)
-MAX_PER_PLATFORM = 12
+MAX_PER_PLATFORM = 8
 # app.py 用
 MAX_DEPARTURES = 12
 
