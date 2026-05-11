@@ -22,3 +22,7 @@ PORT = 5000
 
 # 表示名
 LOCATION_NAME = "QUT Kelvin Grove"
+
+# 音量設定 (0.0 〜 1.0)
+CHIME_VOLUME    = 0.6   # チャイム音量
+ANNOUNCE_VOLUME = 1.0   # アナウンス音量

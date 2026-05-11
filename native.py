@@ -34,6 +34,7 @@ from config import (
     PLATFORM_1_STOP_IDS, PLATFORM_2_STOP_IDS,
     PLATFORM_1_LABEL, PLATFORM_2_LABEL,
     MAX_PER_PLATFORM, CACHE_TTL, LOCATION_NAME,
+    CHIME_VOLUME, ANNOUNCE_VOLUME,
 )
 
 try:
@@ -178,16 +179,19 @@ GTFS_STATIC_URL = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip"
 
 _SOUND_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sound.mp3")
 
+def _play_file(path: str, volume: float):
+    gain = str(int(volume * 100))
+    try:
+        if platform.system() == "Darwin":
+            subprocess.run(["afplay", "-v", str(volume), path], check=False)
+        else:
+            subprocess.run(["mpg123", "-q", "--gain", gain, path], check=False)
+    except Exception as e:
+        print(f"[SOUND] {e}")
+
+
 def _play_sound():
-    def _play():
-        try:
-            if platform.system() == "Darwin":
-                subprocess.run(["afplay", _SOUND_FILE], check=False)
-            else:
-                subprocess.run(["mpg123", "-q", _SOUND_FILE], check=False)
-        except Exception as e:
-            print(f"[SOUND] {e}")
-    threading.Thread(target=_play, daemon=True).start()
+    threading.Thread(target=_play_file, args=(_SOUND_FILE, CHIME_VOLUME), daemon=True).start()
 
 
 _tts_client = None
@@ -214,13 +218,7 @@ def _announce(dep: dict):
 
     def _run():
         # 1. Chime
-        try:
-            if platform.system() == "Darwin":
-                subprocess.run(["afplay", _SOUND_FILE], check=False)
-            else:
-                subprocess.run(["mpg123", "-q", _SOUND_FILE], check=False)
-        except Exception as e:
-            print(f"[SOUND] {e}")
+        _play_file(_SOUND_FILE, CHIME_VOLUME)
 
         # 2. TTS announcement
         if not _TTS_OK:
@@ -242,10 +240,7 @@ def _announce(dep: dict):
                 f.write(response.audio_content)
                 tmp_path = f.name
             try:
-                if platform.system() == "Darwin":
-                    subprocess.run(["afplay", tmp_path], check=False)
-                else:
-                    subprocess.run(["mpg123", "-q", tmp_path], check=False)
+                _play_file(tmp_path, ANNOUNCE_VOLUME)
             finally:
                 os.unlink(tmp_path)
         except Exception as e:
