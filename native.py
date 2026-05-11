@@ -22,10 +22,13 @@ from datetime import datetime
 
 try:
     from google.cloud import texttospeech as _tts_lib
+    from google.oauth2 import service_account as _sa
     _TTS_OK = True
 except ImportError:
     _TTS_OK = False
     print("[WARN] google-cloud-texttospeech not installed. Run: pip install google-cloud-texttospeech")
+
+_CREDENTIALS_FILE = "/home/pi/itd102-496002-2013570bf45b.json"
 
 from config import (
     PLATFORM_1_STOP_IDS, PLATFORM_2_STOP_IDS,
@@ -192,7 +195,11 @@ _tts_client = None
 def _get_tts_client():
     global _tts_client
     if _tts_client is None:
-        _tts_client = _tts_lib.TextToSpeechClient()
+        creds = _sa.Credentials.from_service_account_file(
+            _CREDENTIALS_FILE,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        _tts_client = _tts_lib.TextToSpeechClient(credentials=creds)
     return _tts_client
 
 
