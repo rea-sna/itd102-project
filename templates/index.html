@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ location }} - Departures</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c10;
+      --header-bg: #0d2244;
+      --accent: #1a56a8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --text: #e8edf2;
+      --muted: #6b7280;
+      --border: #1a2030;
+      --row-hover: #0d1520;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    }
+
+    /* ─── Header ─── */
+    header {
+      background: var(--header-bg);
+      padding: 16px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid var(--accent);
+    }
+
+    .location-name {
+      font-size: clamp(1.4rem, 3.5vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .sub-label {
+      font-size: clamp(0.85rem, 2vw, 1.1rem);
+      color: #7ba4d4;
+      margin-top: 4px;
+    }
+
+    .clock {
+      font-size: clamp(1.8rem, 5vw, 3.2rem);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+    }
+
+    /* ─── Table ─── */
+    .table-wrap {
+      overflow: hidden;
+      height: calc(100vh - 48px - 30px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    thead th {
+      background: #0d1520;
+      padding: 10px 20px;
+      font-size: clamp(0.85rem, 2vw, 1.1rem);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+    }
+
+    /* column widths */
+    .col-route    { width: 12%; }
+    .col-dest     { width: 46%; }
+    .col-sched    { width: 16%; }
+    .col-arriving { width: 26%; text-align: right; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover { background: var(--row-hover); }
+
+    tbody td {
+      padding: clamp(14px, 2.5vh, 26px) 20px;
+      font-size: clamp(1.3rem, 3vw, 1.9rem);
+      vertical-align: middle;
+    }
+
+    .route-badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: clamp(1.2rem, 2.8vw, 1.8rem);
+      min-width: 70px;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+
+    .arriving {
+      font-weight: 700;
+      font-size: clamp(1.4rem, 3.2vw, 2.2rem);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .arriving.green { color: var(--green); }
+    .arriving.amber { color: var(--amber); }
+    .arriving.red   { color: var(--red); animation: blink 1s step-end infinite; }
+
+    @keyframes blink { 50% { opacity: 0.35; } }
+
+    /* ─── No service ─── */
+    .no-service {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 60%;
+      color: var(--muted);
+      font-size: clamp(1.2rem, 3vw, 2rem);
+    }
+
+    /* ─── Status bar ─── */
+    .status-bar {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      height: 30px;
+      background: #05090e;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .status-bar .error { color: var(--red); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="location-name">{{ location }}</div>
+    <div class="sub-label">Real-Time Departures &mdash; TransLink SEQ</div>
+  </div>
+  <div class="clock" id="clock">--:--:--</div>
+</header>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="col-route">Route</th>
+        <th class="col-dest">Destination</th>
+        <th class="col-sched">Scheduled</th>
+        <th class="col-arriving">Arriving</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="4"><div class="no-service">Loading&hellip;</div></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="status-bar">
+  <span id="status-left">Connecting&hellip;</span>
+  <span id="status-right">TransLink Open Data</span>
+</div>
+
+<script>
+  // 現在の出発データ (arrival_ts を使ってカウントダウンをリアルタイム更新)
+  let departures = [];
+
+  // ── 時計 ──────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+  }
+
+  // ── カウントダウン表示 ─────────────────────────────
+  function formatArrival(arrival_ts) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const diff = arrival_ts - nowSec;
+    if (diff <= 0)  return { text: 'NOW',        cls: 'red'   };
+    if (diff < 120) return { text: `${Math.ceil(diff / 60)} min`, cls: 'red'   };
+    if (diff < 300) return { text: `${Math.ceil(diff / 60)} min`, cls: 'amber' };
+    const mins = Math.floor(diff / 60);
+    return { text: `${mins} min`, cls: 'green' };
+  }
+
+  // ── テーブル描画 ───────────────────────────────────
+  function renderTable() {
+    const tbody = document.getElementById('tbody');
+
+    if (departures.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4"><div class="no-service">No upcoming services</div></td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = departures.map(d => {
+      const arr = formatArrival(d.arrival_ts);
+      return `<tr>
+        <td><span class="route-badge">${escHtml(d.route)}</span></td>
+        <td>${escHtml(d.headsign || '—')}</td>
+        <td>${escHtml(d.scheduled)}</td>
+        <td><span class="arriving ${arr.cls}">${arr.text}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // ── API フェッチ ───────────────────────────────────
+  async function fetchDepartures() {
+    try {
+      const resp = await fetch('/api/departures');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+
+      departures = data.departures || [];
+      renderTable();
+
+      const statusLeft = document.getElementById('status-left');
+      if (data.error) {
+        statusLeft.textContent = `Error: ${data.error}`;
+        statusLeft.className = 'error';
+      } else {
+        statusLeft.textContent = `Updated: ${data.updated}  |  Stops: ${(data.stop_ids || []).join(', ')}`;
+        statusLeft.className = '';
+      }
+
+    } catch (e) {
+      document.getElementById('status-left').textContent = 'Connection error — retrying…';
+      document.getElementById('status-left').className = 'error';
+    }
+  }
+
+  // ── 初期化 ─────────────────────────────────────────
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // カウントダウンは毎秒再描画 (計算のみ、DOM 全体は再構築しない)
+  setInterval(renderTable, 10000);
+
+  fetchDepartures();
+  setInterval(fetchDepartures, 30000);
+</script>
+</body>
+</html>
