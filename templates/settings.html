@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TransLink Signage — Settings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #080c10;
+      --header-bg:  #0d2244;
+      --accent:     #1a56a8;
+      --green:      #22c55e;
+      --amber:      #f59e0b;
+      --red:        #ef4444;
+      --text:       #e8edf2;
+      --muted:      #6b7280;
+      --border:     #1a2030;
+      --card-bg:    #0d1520;
+      --input-bg:   #111827;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    }
+
+    header {
+      background: var(--header-bg);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid var(--accent);
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+
+    header a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 6px 14px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    header a:hover { background: var(--accent); color: #fff; }
+
+    .container {
+      max-width: 680px;
+      margin: 40px auto;
+      padding: 0 20px 60px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 28px;
+    }
+
+    button {
+      padding: 11px 28px;
+      border-radius: 7px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+
+    button:hover { opacity: 0.85; }
+
+    .btn-save {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-reset {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    #status-msg {
+      font-size: 0.9rem;
+      padding: 6px 12px;
+      border-radius: 5px;
+      display: none;
+    }
+
+    #status-msg.ok    { background: #052e1a; color: var(--green); display: block; }
+    #status-msg.error { background: #2c0a0a; color: var(--red);   display: block; }
+
+    .current-value {
+      font-size: 0.78rem;
+      color: #4b5563;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Signage Settings</h1>
+  <a href="/">← Back to Display</a>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <div class="card-title">Location</div>
+    <div class="field">
+      <label for="location">Display Name</label>
+      <input type="text" id="location" placeholder="e.g. QUT Kelvin Grove">
+      <div class="hint">Shown in the top-left corner of the signage display.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Platform 1</div>
+    <div class="field">
+      <label for="p1-stops">Stop IDs</label>
+      <input type="text" id="p1-stops" placeholder="e.g. 884, 885">
+      <div class="hint">Comma-separated TransLink stop IDs. Find them at <em>/api/debug/stops</em>.</div>
+    </div>
+    <div class="field">
+      <label for="p1-label">Banner Label</label>
+      <input type="text" id="p1-label" placeholder="e.g. Platform 1 - Outbound">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Platform 2</div>
+    <div class="field">
+      <label for="p2-stops">Stop IDs</label>
+      <input type="text" id="p2-stops" placeholder="e.g. 889, 890">
+      <div class="hint">Comma-separated TransLink stop IDs.</div>
+    </div>
+    <div class="field">
+      <label for="p2-label">Banner Label</label>
+      <input type="text" id="p2-label" placeholder="e.g. Platform 2 - Inbound">
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-save" onclick="saveSettings()">Save &amp; Apply</button>
+    <button class="btn-reset" onclick="loadSettings()">Discard Changes</button>
+    <span id="status-msg"></span>
+  </div>
+
+</div>
+
+<script>
+  async function loadSettings() {
+    try {
+      const resp = await fetch('/api/settings');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const s = await resp.json();
+
+      document.getElementById('location').value  = s.location  || '';
+      document.getElementById('p1-stops').value  = (s.p1_stops || []).join(', ');
+      document.getElementById('p1-label').value  = s.p1_label  || '';
+      document.getElementById('p2-stops').value  = (s.p2_stops || []).join(', ');
+      document.getElementById('p2-label').value  = s.p2_label  || '';
+
+      setStatus('', '');
+    } catch (e) {
+      setStatus('error', `Failed to load settings: ${e.message}`);
+    }
+  }
+
+  async function saveSettings() {
+    const payload = {
+      location: document.getElementById('location').value.trim(),
+      p1_stops: document.getElementById('p1-stops').value.trim(),
+      p1_label: document.getElementById('p1-label').value.trim(),
+      p2_stops: document.getElementById('p2-stops').value.trim(),
+      p2_label: document.getElementById('p2-label').value.trim(),
+    };
+
+    try {
+      const resp = await fetch('/api/settings', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      setStatus('ok', 'Settings saved. Display will update on next refresh.');
+    } catch (e) {
+      setStatus('error', `Save failed: ${e.message}`);
+    }
+  }
+
+  function setStatus(cls, msg) {
+    const el = document.getElementById('status-msg');
+    el.className = cls;
+    el.textContent = msg;
+  }
+
+  loadSettings();
+</script>
+</body>
+</html>

@@ -9,6 +9,7 @@ import subprocess
 import platform as _platform
 import tempfile
 import os
+import json
 from datetime import datetime
 
 from config import (
@@ -28,6 +29,33 @@ except ImportError:
 
 _CREDENTIALS_FILE = "/home/pi/itd102-496002-2013570bf45b.json"
 _SOUND_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sound.mp3")
+_SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+
+# ── ランタイム設定 (settings.json で上書き可能) ───────────────────────────
+_runtime = {
+    "location": LOCATION_NAME,
+    "p1_stops": sorted(PLATFORM_1_STOP_IDS),
+    "p2_stops": sorted(PLATFORM_2_STOP_IDS),
+    "p1_label": PLATFORM_1_LABEL,
+    "p2_label": PLATFORM_2_LABEL,
+}
+
+def _load_settings():
+    try:
+        with open(_SETTINGS_FILE) as f:
+            saved = json.load(f)
+        _runtime.update(saved)
+        print(f"[SETTINGS] Loaded from {_SETTINGS_FILE}")
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"[SETTINGS] Load failed: {e}")
+
+def _save_settings():
+    with open(_SETTINGS_FILE, "w") as f:
+        json.dump(_runtime, f, indent=2)
+
+_load_settings()
 
 try:
     from google.transit import gtfs_realtime_pb2
@@ -155,8 +183,8 @@ def _fetch_all():
         resp.raise_for_status()
         content = resp.content
 
-        _cache["p1"]         = _parse_feed(content, PLATFORM_1_STOP_IDS)
-        _cache["p2"]         = _parse_feed(content, PLATFORM_2_STOP_IDS)
+        _cache["p1"]         = _parse_feed(content, set(_runtime["p1_stops"]))
+        _cache["p2"]         = _parse_feed(content, set(_runtime["p2_stops"]))
         _cache["fetched_at"] = now
         _cache["error"]      = None
 
@@ -232,23 +260,57 @@ def _do_announce(route: str, headsign: str):
 # ── ルーティング ──────────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    return render_template("index.html", location=LOCATION_NAME)
+    return render_template("index.html", location=_runtime["location"])
 
 
 @app.route("/api/departures")
 def api_departures():
     _fetch_all()
-    all_stops = sorted(PLATFORM_1_STOP_IDS | PLATFORM_2_STOP_IDS)
+    all_stops = sorted(set(_runtime["p1_stops"]) | set(_runtime["p2_stops"]))
     return jsonify({
         "p1":        _cache["p1"],
         "p2":        _cache["p2"],
-        "p1_label":  PLATFORM_1_LABEL,
-        "p2_label":  PLATFORM_2_LABEL,
+        "p1_label":  _runtime["p1_label"],
+        "p2_label":  _runtime["p2_label"],
         "updated":   datetime.now().strftime("%H:%M:%S"),
         "error":     _cache["error"],
         "gtfs_ready": _static["loaded"],
         "stop_ids":  all_stops,
     })
+
+
+@app.route("/settings")
+def settings_page():
+    return render_template("settings.html")
+
+
+@app.route("/api/settings", methods=["GET"])
+def api_settings_get():
+    return jsonify(_runtime)
+
+
+@app.route("/api/settings", methods=["POST"])
+def api_settings_post():
+    data = request.get_json(force=True, silent=True) or {}
+
+    if "location" in data:
+        _runtime["location"] = str(data["location"]).strip() or _runtime["location"]
+    if "p1_label" in data:
+        _runtime["p1_label"] = str(data["p1_label"]).strip()
+    if "p2_label" in data:
+        _runtime["p2_label"] = str(data["p2_label"]).strip()
+    if "p1_stops" in data:
+        stops = [s.strip() for s in str(data["p1_stops"]).split(",") if s.strip()]
+        if stops:
+            _runtime["p1_stops"] = stops
+    if "p2_stops" in data:
+        stops = [s.strip() for s in str(data["p2_stops"]).split(",") if s.strip()]
+        if stops:
+            _runtime["p2_stops"] = stops
+
+    _save_settings()
+    _cache["fetched_at"] = 0  # force refresh on next /api/departures call
+    return jsonify({"ok": True, "settings": _runtime})
 
 
 @app.route("/api/announce", methods=["POST"])
