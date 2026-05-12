@@ -80,6 +80,25 @@ _cache = {
     "error":      None,
 }
 
+# ── サーバー側アナウンスループ (native.py の _tick と同等) ────────────────
+_alerted: set[int] = set()
+
+def _announcement_loop():
+    while True:
+        time.sleep(1)
+        now_ts = int(time.time())
+        for dep in _cache["p1"] + _cache["p2"]:
+            diff = dep["arrival_ts"] - now_ts
+            if 0 < diff <= 60 and dep["arrival_ts"] not in _alerted:
+                _alerted.add(dep["arrival_ts"])
+                threading.Thread(
+                    target=_do_announce,
+                    args=(dep["route"], dep.get("headsign", "")),
+                    daemon=True,
+                ).start()
+        # 180秒以上過去のエントリを掃除
+        stale = {ts for ts in _alerted if ts < now_ts - 180}
+        _alerted.difference_update(stale)
 
 def _parse_feed(content: bytes, stop_ids: set) -> list[dict]:
     feed = gtfs_realtime_pb2.FeedMessage()
@@ -208,6 +227,9 @@ def _do_announce(route: str, headsign: str):
             os.unlink(tmp_path)
     except Exception as e:
         print(f"[TTS] {e}")
+
+
+threading.Thread(target=_announcement_loop, daemon=True).start()
 
 
 # ── ルーティング ──────────────────────────────────────────────────────────

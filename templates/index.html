@@ -321,31 +321,9 @@
     requestAnimationFrame(() => applyScrolling(tbody));
   }
 
-  // ── 1分前アラート (native.py の _alerted セットと同じ管理)
-  const alerted = new Set();
-
-  function checkAnnouncements(nowSec) {
-    document.querySelectorAll('tr[data-ts]').forEach(row => {
-      const ts   = parseInt(row.dataset.ts, 10);
-      const diff = ts - nowSec;
-      if (diff > 0 && diff <= 60 && !alerted.has(ts)) {
-        alerted.add(ts);
-        fetch('/api/announce', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ route: row.dataset.route, headsign: row.dataset.headsign }),
-        }).catch(() => {});
-      }
-    });
-    // 180秒以上過去のエントリを削除
-    for (const ts of alerted) {
-      if (ts < nowSec - 180) alerted.delete(ts);
-    }
-  }
-
   // ── Per-second arrival tick (avoids full re-render)
+  // アナウンスはサーバー側のバックグラウンドスレッドが担当する
   function tickArrival() {
-    const nowSec = Math.floor(Date.now() / 1000);
     document.querySelectorAll('tr[data-ts]').forEach(row => {
       const span = row.querySelector('[data-arrival]');
       if (!span) return;
@@ -353,7 +331,6 @@
       span.textContent = text;
       span.className   = `arriving ${cls}`;
     });
-    checkAnnouncements(nowSec);
   }
 
   // ── Re-check scrolling on window resize
