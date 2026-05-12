@@ -179,6 +179,12 @@
 
     @keyframes blink { 50% { opacity: 0; } }
 
+    /* ─── Filler rows ─── */
+    .filler-row td {
+      padding: clamp(10px, 2vh, 22px) 18px;
+      font-size: clamp(1.1rem, 2vw, 1.7rem);
+    }
+
     /* ─── No service ─── */
     .no-service {
       color: var(--muted);
@@ -298,33 +304,45 @@
     });
   }
 
+  const MIN_ROWS = 8;
+
   // ── Render one platform panel
   function renderPanel(tbodyId, bannerId, deps, label) {
     document.getElementById(bannerId).textContent = label;
     const tbody = document.getElementById(tbodyId);
 
-    if (!deps || deps.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4"><div class="no-service">No upcoming services</div></td></tr>';
-      return;
-    }
+    const rows = [];
 
-    tbody.innerHTML = deps.map(d => {
-      const { text, cls } = formatArrival(d.arrival_ts);
-      return `<tr data-ts="${d.arrival_ts}" data-route="${escHtml(d.route)}" data-headsign="${escHtml(d.headsign || '')}">
+    if (!deps || deps.length === 0) {
+      rows.push('<tr><td colspan="4"><div class="no-service">No upcoming services</div></td></tr>');
+      for (let i = 1; i < MIN_ROWS; i++) {
+        rows.push('<tr class="filler-row"><td colspan="4"></td></tr>');
+      }
+    } else {
+      rows.push(...deps.map(d => {
+        const { text, cls } = formatArrival(d.arrival_ts);
+        return `<tr data-ts="${d.arrival_ts}" data-route="${escHtml(d.route)}" data-headsign="${escHtml(d.headsign || '')}">
         <td><span class="route-badge">${escHtml(d.route)}</span></td>
         <td><div class="dest-wrap"><span class="dest-inner">${escHtml(d.headsign || '—')}</span></div></td>
         <td>${escHtml(d.scheduled)}</td>
         <td><span class="arriving ${cls}" data-arrival>${text}</span></td>
       </tr>`;
-    }).join('');
+      }));
+      for (let i = deps.length; i < MIN_ROWS; i++) {
+        rows.push('<tr class="filler-row"><td colspan="4"></td></tr>');
+      }
+    }
 
+    tbody.innerHTML = rows.join('');
     requestAnimationFrame(() => applyScrolling(tbody));
   }
 
   // ── Audio Announcements
-  let _lastDeps   = [];
-  let _audioReady = false;
-  const _clientAlerted = new Set();
+  let _lastDeps    = [];
+  let _audioReady  = false;
+  const _clientAlerted  = new Map();   // key → alerted_at_ts
+  const _announceQueue  = [];
+  let   _announcePlaying = false;
 
   function _unlockAudio() {
     if (_audioReady) return;
@@ -333,15 +351,20 @@
     if (badge) badge.remove();
   }
 
-  function _playSequential(route, headsign) {
+  function _drainQueue() {
+    if (_announcePlaying || _announceQueue.length === 0) return;
+    const { route, headsign } = _announceQueue.shift();
+    _announcePlaying = true;
+
     const chime = new Audio('/audio/chime');
-    chime.play().catch(() => {});
+    chime.play().catch(() => { _announcePlaying = false; _drainQueue(); });
     chime.addEventListener('ended', () => {
       const text = headsign
         ? `Bus ${route} to ${headsign}, arriving in 1 minute.`
         : `Bus ${route}, arriving in 1 minute.`;
       const tts = new Audio('/api/tts?' + new URLSearchParams({ text }));
-      tts.play().catch(() => {});
+      tts.play().catch(() => { _announcePlaying = false; _drainQueue(); });
+      tts.addEventListener('ended', () => { _announcePlaying = false; _drainQueue(); });
     });
   }
 
@@ -350,13 +373,16 @@
     const nowTs = Math.floor(Date.now() / 1000);
     for (const dep of _lastDeps) {
       const diff = dep.arrival_ts - nowTs;
-      if (diff > 0 && diff <= 60 && !_clientAlerted.has(dep.arrival_ts)) {
-        _clientAlerted.add(dep.arrival_ts);
-        _playSequential(dep.route, dep.headsign || '');
+      // Key by route+scheduled (stable across API refreshes) instead of arrival_ts
+      const key = `${dep.route}|${dep.scheduled}`;
+      if (diff > 0 && diff <= 60 && !_clientAlerted.has(key)) {
+        _clientAlerted.set(key, nowTs);
+        _announceQueue.push({ route: dep.route, headsign: dep.headsign || '' });
+        _drainQueue();
       }
     }
-    for (const ts of _clientAlerted) {
-      if (ts < nowTs - 180) _clientAlerted.delete(ts);
+    for (const [key, alertedAt] of _clientAlerted) {
+      if (alertedAt < nowTs - 300) _clientAlerted.delete(key);
     }
   }
 
