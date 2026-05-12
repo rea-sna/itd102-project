@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file, Response
 import requests
 import time
 import io
@@ -229,9 +229,6 @@ def _do_announce(route: str, headsign: str):
         print(f"[TTS] {e}")
 
 
-threading.Thread(target=_announcement_loop, daemon=True).start()
-
-
 # ── ルーティング ──────────────────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -263,6 +260,36 @@ def api_announce():
         return jsonify({"error": "route required"}), 400
     threading.Thread(target=_do_announce, args=(route, headsign), daemon=True).start()
     return jsonify({"ok": True})
+
+
+@app.route("/audio/chime")
+def audio_chime():
+    return send_file(_SOUND_FILE, mimetype="audio/mpeg")
+
+
+@app.route("/api/tts")
+def api_tts():
+    text = request.args.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "text required"}), 400
+    if not _TTS_OK:
+        return jsonify({"error": "TTS not available"}), 503
+    try:
+        client = _get_tts_client()
+        tts_resp = client.synthesize_speech(
+            input=_tts_lib.SynthesisInput(text=text),
+            voice=_tts_lib.VoiceSelectionParams(
+                language_code="en-AU",
+                name="en-AU-Neural2-D",
+            ),
+            audio_config=_tts_lib.AudioConfig(
+                audio_encoding=_tts_lib.AudioEncoding.MP3,
+                speaking_rate=0.95,
+            ),
+        )
+        return Response(tts_resp.audio_content, mimetype="audio/mpeg")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/debug/stops")

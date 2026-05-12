@@ -321,8 +321,70 @@
     requestAnimationFrame(() => applyScrolling(tbody));
   }
 
+  // ── Audio Announcements
+  let _lastDeps   = [];
+  let _audioReady = false;
+  const _clientAlerted = new Set();
+
+  function _unlockAudio() {
+    if (_audioReady) return;
+    _audioReady = true;
+    const badge = document.getElementById('audio-badge');
+    if (badge) badge.remove();
+  }
+
+  function _playSequential(route, headsign) {
+    const chime = new Audio('/audio/chime');
+    chime.play().catch(() => {});
+    chime.addEventListener('ended', () => {
+      const text = headsign
+        ? `Bus ${route} to ${headsign}, arriving in 1 minute.`
+        : `Bus ${route}, arriving in 1 minute.`;
+      const tts = new Audio('/api/tts?' + new URLSearchParams({ text }));
+      tts.play().catch(() => {});
+    });
+  }
+
+  function _checkAnnouncements() {
+    if (!_audioReady) return;
+    const nowTs = Math.floor(Date.now() / 1000);
+    for (const dep of _lastDeps) {
+      const diff = dep.arrival_ts - nowTs;
+      if (diff > 0 && diff <= 60 && !_clientAlerted.has(dep.arrival_ts)) {
+        _clientAlerted.add(dep.arrival_ts);
+        _playSequential(dep.route, dep.headsign || '');
+      }
+    }
+    for (const ts of _clientAlerted) {
+      if (ts < nowTs - 180) _clientAlerted.delete(ts);
+    }
+  }
+
+  // Non-intrusive audio unlock badge (hidden if kiosk auto-unlock succeeds)
+  (function () {
+    const badge = document.createElement('span');
+    badge.id = 'audio-badge';
+    badge.style.cssText = 'cursor:pointer;color:var(--amber);margin-left:1rem;';
+    badge.textContent = '[click to enable audio]';
+    badge.addEventListener('click', _unlockAudio);
+    const sl = document.getElementById('status-left');
+    sl.parentNode.insertBefore(badge, sl.nextSibling);
+  })();
+
+  document.addEventListener('click', _unlockAudio, { once: true });
+
+  // Auto-unlock for kiosk / browsers with autoplay allowed
+  (async () => {
+    try {
+      const a = new Audio('/audio/chime');
+      a.volume = 0;
+      await a.play();
+      a.pause();
+      _unlockAudio();
+    } catch (e) {}
+  })();
+
   // ── Per-second arrival tick (avoids full re-render)
-  // アナウンスはサーバー側のバックグラウンドスレッドが担当する
   function tickArrival() {
     document.querySelectorAll('tr[data-ts]').forEach(row => {
       const span = row.querySelector('[data-arrival]');
@@ -331,6 +393,7 @@
       span.textContent = text;
       span.className   = `arriving ${cls}`;
     });
+    _checkAnnouncements();
   }
 
   // ── Re-check scrolling on window resize
@@ -351,6 +414,7 @@
 
       renderPanel('p1-tbody', 'p1-banner', data.p1, data.p1_label || 'Platform 1');
       renderPanel('p2-tbody', 'p2-banner', data.p2, data.p2_label || 'Platform 2');
+      _lastDeps = [...(data.p1 || []), ...(data.p2 || [])];
 
       const el = document.getElementById('status-left');
       if (data.error) {
