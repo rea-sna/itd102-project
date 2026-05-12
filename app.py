@@ -38,6 +38,8 @@ _runtime = {
     "p2_stops": sorted(PLATFORM_2_STOP_IDS),
     "p1_label": PLATFORM_1_LABEL,
     "p2_label": PLATFORM_2_LABEL,
+    "announce_template":             "Bus {route} to {headsign}, arriving in 1 minute.",
+    "announce_template_no_headsign": "Bus {route}, arriving in 1 minute.",
 }
 
 def _load_settings():
@@ -222,10 +224,13 @@ def _play_file(path: str, volume: float):
 
 
 def _do_announce(route: str, headsign: str):
-    if headsign:
-        speech_text = f"Bus {route} to {headsign}, arriving in 1 minute."
-    else:
-        speech_text = f"Bus {route}, arriving in 1 minute."
+    try:
+        if headsign:
+            speech_text = _runtime["announce_template"].format(route=route, headsign=headsign)
+        else:
+            speech_text = _runtime["announce_template_no_headsign"].format(route=route)
+    except KeyError:
+        speech_text = f"Bus {route} arriving in 1 minute."
 
     # 1. チャイム
     _play_file(_SOUND_FILE, CHIME_VOLUME)
@@ -307,6 +312,14 @@ def api_settings_post():
         stops = [s.strip() for s in str(data["p2_stops"]).split(",") if s.strip()]
         if stops:
             _runtime["p2_stops"] = stops
+    if "announce_template" in data:
+        v = str(data["announce_template"]).strip()
+        if v:
+            _runtime["announce_template"] = v
+    if "announce_template_no_headsign" in data:
+        v = str(data["announce_template_no_headsign"]).strip()
+        if v:
+            _runtime["announce_template_no_headsign"] = v
 
     _save_settings()
     _cache["fetched_at"] = 0  # force refresh on next /api/departures call

@@ -208,6 +208,20 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-title">Announcement Text</div>
+    <div class="field">
+      <label for="announce-template">With Destination</label>
+      <input type="text" id="announce-template" placeholder="Bus {route} to {headsign}, arriving in 1 minute.">
+      <div class="hint">Use <code>{route}</code> and <code>{headsign}</code> as placeholders.</div>
+    </div>
+    <div class="field">
+      <label for="announce-template-no-headsign">Without Destination</label>
+      <input type="text" id="announce-template-no-headsign" placeholder="Bus {route}, arriving in 1 minute.">
+      <div class="hint">Use <code>{route}</code> as a placeholder.</div>
+    </div>
+  </div>
+
   <div class="btn-row">
     <button class="btn-save" onclick="saveSettings()">Save &amp; Apply</button>
     <button class="btn-reset" onclick="loadSettings()">Discard Changes</button>
@@ -228,6 +242,8 @@
       document.getElementById('p1-label').value  = s.p1_label  || '';
       document.getElementById('p2-stops').value  = (s.p2_stops || []).join(', ');
       document.getElementById('p2-label').value  = s.p2_label  || '';
+      document.getElementById('announce-template').value             = s.announce_template             || '';
+      document.getElementById('announce-template-no-headsign').value = s.announce_template_no_headsign || '';
 
       setStatus('', '');
     } catch (e) {
@@ -242,6 +258,8 @@
       p1_label: document.getElementById('p1-label').value.trim(),
       p2_stops: document.getElementById('p2-stops').value.trim(),
       p2_label: document.getElementById('p2-label').value.trim(),
+      announce_template:             document.getElementById('announce-template').value.trim(),
+      announce_template_no_headsign: document.getElementById('announce-template-no-headsign').value.trim(),
     };
 
     try {
