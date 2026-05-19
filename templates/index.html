@@ -343,6 +343,19 @@
   const _clientAlerted  = new Map();   // key → alerted_at_ts
   const _announceQueue  = [];
   let   _announcePlaying = false;
+  let _announceTemplate          = 'Bus {route} to {headsign}, arriving in 1 minute.';
+  let _announceTemplateNoHeadsign = 'Bus {route}, arriving in 1 minute.';
+
+  async function _loadTemplates() {
+    try {
+      const resp = await fetch('/api/settings');
+      if (!resp.ok) return;
+      const s = await resp.json();
+      if (s.announce_template)             _announceTemplate           = s.announce_template;
+      if (s.announce_template_no_headsign) _announceTemplateNoHeadsign = s.announce_template_no_headsign;
+    } catch (e) {}
+  }
+  _loadTemplates();
 
   function _unlockAudio() {
     if (_audioReady) return;
@@ -357,9 +370,8 @@
     _announcePlaying = true;
 
     const chimeUrl = platform === 2 ? '/audio/chime/up' : '/audio/chime/down';
-    const text = headsign
-      ? `Bus ${route} to ${headsign}, arriving in 1 minute.`
-      : `Bus ${route}, arriving in 1 minute.`;
+    const tmpl = headsign ? _announceTemplate : _announceTemplateNoHeadsign;
+    const text = tmpl.replace('{route}', route).replace('{headsign}', headsign);
     const ttsUrl = '/api/tts?' + new URLSearchParams({ text, platform: String(platform) });
 
     // チャイムと並行してTTSをプリフェッチ
