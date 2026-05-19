@@ -40,8 +40,8 @@ _runtime = {
     "p2_stops": sorted(PLATFORM_2_STOP_IDS),
     "p1_label": PLATFORM_1_LABEL,
     "p2_label": PLATFORM_2_LABEL,
-    "announce_template":             "Bus {route} to {headsign}, arriving in 1 minute.",
-    "announce_template_no_headsign": "Bus {route}, arriving in 1 minute.",
+    "announce_template":             "Bus {route} to {headsign}, arriving soon.",
+    "announce_template_no_headsign": "Bus {route}, arriving soon.",
 }
 
 def _load_settings():
@@ -119,15 +119,16 @@ def _announcement_loop():
     while True:
         time.sleep(1)
         now_ts = int(time.time())
-        for dep in _cache["p1"] + _cache["p2"]:
-            diff = dep["arrival_ts"] - now_ts
-            if 0 < diff <= 60 and dep["arrival_ts"] not in _alerted:
-                _alerted.add(dep["arrival_ts"])
-                threading.Thread(
-                    target=_do_announce,
-                    args=(dep["route"], dep.get("headsign", "")),
-                    daemon=True,
-                ).start()
+        for platform, deps in ((1, _cache["p1"]), (2, _cache["p2"])):
+            for dep in deps:
+                diff = dep["arrival_ts"] - now_ts
+                if 0 < diff <= 60 and dep["arrival_ts"] not in _alerted:
+                    _alerted.add(dep["arrival_ts"])
+                    threading.Thread(
+                        target=_do_announce,
+                        args=(dep["route"], dep.get("headsign", ""), platform),
+                        daemon=True,
+                    ).start()
         # 180秒以上過去のエントリを掃除
         stale = {ts for ts in _alerted if ts < now_ts - 180}
         _alerted.difference_update(stale)
@@ -201,6 +202,11 @@ def _fetch_all():
 
 
 # ── TTS / チャイム ────────────────────────────────────────────────────────
+_VOICE_FOR_PLATFORM = {
+    1: "en-AU-Neural2-D",  # male
+    2: "en-AU-Neural2-A",  # female
+}
+
 _tts_client = None
 
 def _get_tts_client():
@@ -225,43 +231,55 @@ def _play_file(path: str, volume: float):
         print(f"[SOUND] {e}")
 
 
-def _do_announce(route: str, headsign: str):
+def _do_announce(route: str, headsign: str, platform: int = 1):
     try:
         if headsign:
             speech_text = _runtime["announce_template"].format(route=route, headsign=headsign)
         else:
             speech_text = _runtime["announce_template_no_headsign"].format(route=route)
     except KeyError:
-        speech_text = f"Bus {route} arriving in 1 minute."
+        speech_text = f"Bus {route} arriving soon."
 
-    # 1. チャイム
-    _play_file(_SOUND_FILE, CHIME_VOLUME)
+    # TTS合成とチャイム再生を並行して実行し、チャイム終了後すぐ再生
+    tmp_path = None
+    tts_error = [None]
 
-    # 2. TTS アナウンス
-    if not _TTS_OK:
-        return
-    try:
-        client = _get_tts_client()
-        response = client.synthesize_speech(
-            input=_tts_lib.SynthesisInput(text=speech_text),
-            voice=_tts_lib.VoiceSelectionParams(
-                language_code="en-AU",
-                name="en-AU-Neural2-D",
-            ),
-            audio_config=_tts_lib.AudioConfig(
-                audio_encoding=_tts_lib.AudioEncoding.MP3,
-                speaking_rate=0.95,
-            ),
-        )
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-            f.write(response.audio_content)
-            tmp_path = f.name
+    def _fetch_tts():
+        if not _TTS_OK:
+            return
+        try:
+            client = _get_tts_client()
+            voice_name = _VOICE_FOR_PLATFORM.get(platform, "en-AU-Neural2-D")
+            response = client.synthesize_speech(
+                input=_tts_lib.SynthesisInput(text=speech_text),
+                voice=_tts_lib.VoiceSelectionParams(
+                    language_code="en-AU",
+                    name=voice_name,
+                ),
+                audio_config=_tts_lib.AudioConfig(
+                    audio_encoding=_tts_lib.AudioEncoding.MP3,
+                    speaking_rate=0.95,
+                ),
+            )
+            nonlocal tmp_path
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                f.write(response.audio_content)
+                tmp_path = f.name
+        except Exception as e:
+            tts_error[0] = e
+            print(f"[TTS] {e}")
+
+    tts_thread = threading.Thread(target=_fetch_tts, daemon=True)
+    tts_thread.start()
+
+    _play_file(_SOUND_FILE, CHIME_VOLUME)  # チャイム再生（TTS合成と並行）
+
+    tts_thread.join()  # チャイム終了時点でTTSが揃っていれば待ち時間ゼロ
+    if tmp_path:
         try:
             _play_file(tmp_path, ANNOUNCE_VOLUME)
         finally:
             os.unlink(tmp_path)
-    except Exception as e:
-        print(f"[TTS] {e}")
 
 
 # ── ルーティング ──────────────────────────────────────────────────────────
@@ -362,12 +380,14 @@ def api_tts():
     if not _TTS_OK:
         return jsonify({"error": "TTS not available"}), 503
     try:
+        platform = int(request.args.get("platform", "1"))
+        voice_name = _VOICE_FOR_PLATFORM.get(platform, "en-AU-Neural2-D")
         client = _get_tts_client()
         tts_resp = client.synthesize_speech(
             input=_tts_lib.SynthesisInput(text=text),
             voice=_tts_lib.VoiceSelectionParams(
                 language_code="en-AU",
-                name="en-AU-Neural2-D",
+                name=voice_name,
             ),
             audio_config=_tts_lib.AudioConfig(
                 audio_encoding=_tts_lib.AudioEncoding.MP3,

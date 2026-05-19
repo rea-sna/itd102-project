@@ -357,13 +357,19 @@
     _announcePlaying = true;
 
     const chimeUrl = platform === 2 ? '/audio/chime/up' : '/audio/chime/down';
+    const text = headsign
+      ? `Bus ${route} to ${headsign}, arriving in 1 minute.`
+      : `Bus ${route}, arriving in 1 minute.`;
+    const ttsUrl = '/api/tts?' + new URLSearchParams({ text, platform: String(platform) });
+
+    // チャイムと並行してTTSをプリフェッチ
+    const tts = new Audio(ttsUrl);
+    tts.preload = 'auto';
+    tts.load();
+
     const chime = new Audio(chimeUrl);
     chime.play().catch(() => { _announcePlaying = false; _drainQueue(); });
     chime.addEventListener('ended', () => {
-      const text = headsign
-        ? `Bus ${route} to ${headsign}, arriving in 1 minute.`
-        : `Bus ${route}, arriving in 1 minute.`;
-      const tts = new Audio('/api/tts?' + new URLSearchParams({ text }));
       tts.play().catch(() => { _announcePlaying = false; _drainQueue(); });
       tts.addEventListener('ended', () => { _announcePlaying = false; _drainQueue(); });
     });
