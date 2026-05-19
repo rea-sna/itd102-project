@@ -28,7 +28,9 @@ except ImportError:
     print("[WARN] google-cloud-texttospeech not installed. Run: pip install google-cloud-texttospeech")
 
 _CREDENTIALS_FILE = "/home/pi/itd102-496002-2013570bf45b.json"
-_SOUND_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sound.mp3")
+_SOUND_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sound.mp3")
+_DOWN_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "down.mp3")
+_UP_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "up.mp3")
 _SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
 # ── ランタイム設定 (settings.json で上書き可能) ───────────────────────────
@@ -340,6 +342,16 @@ def api_announce():
 @app.route("/audio/chime")
 def audio_chime():
     return send_file(_SOUND_FILE, mimetype="audio/mpeg")
+
+
+@app.route("/audio/chime/down")
+def audio_chime_down():
+    return send_file(_DOWN_FILE, mimetype="audio/mpeg")
+
+
+@app.route("/audio/chime/up")
+def audio_chime_up():
+    return send_file(_UP_FILE, mimetype="audio/mpeg")
 
 
 @app.route("/api/tts")

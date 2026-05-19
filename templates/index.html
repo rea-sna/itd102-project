@@ -353,10 +353,11 @@
 
   function _drainQueue() {
     if (_announcePlaying || _announceQueue.length === 0) return;
-    const { route, headsign } = _announceQueue.shift();
+    const { route, headsign, platform } = _announceQueue.shift();
     _announcePlaying = true;
 
-    const chime = new Audio('/audio/chime');
+    const chimeUrl = platform === 2 ? '/audio/chime/up' : '/audio/chime/down';
+    const chime = new Audio(chimeUrl);
     chime.play().catch(() => { _announcePlaying = false; _drainQueue(); });
     chime.addEventListener('ended', () => {
       const text = headsign
@@ -377,7 +378,7 @@
       const key = `${dep.route}|${dep.scheduled}`;
       if (diff > 0 && diff <= 60 && !_clientAlerted.has(key)) {
         _clientAlerted.set(key, nowTs);
-        _announceQueue.push({ route: dep.route, headsign: dep.headsign || '' });
+        _announceQueue.push({ route: dep.route, headsign: dep.headsign || '', platform: dep._platform });
         _drainQueue();
       }
     }
@@ -440,7 +441,10 @@
 
       renderPanel('p1-tbody', 'p1-banner', data.p1, data.p1_label || 'Platform 1');
       renderPanel('p2-tbody', 'p2-banner', data.p2, data.p2_label || 'Platform 2');
-      _lastDeps = [...(data.p1 || []), ...(data.p2 || [])];
+      _lastDeps = [
+        ...(data.p1 || []).map(d => ({ ...d, _platform: 1 })),
+        ...(data.p2 || []).map(d => ({ ...d, _platform: 2 })),
+      ];
 
       const el = document.getElementById('status-left');
       if (data.error) {
