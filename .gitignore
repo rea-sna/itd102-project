@@ -23,6 +23,7 @@ ENV/
 
 # exclude translink static files
 static/*
+!static/.gitkeep
 
 # IDE
 .vscode/
