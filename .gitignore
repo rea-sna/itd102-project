@@ -22,7 +22,7 @@ env/
 ENV/
 
 # exclude translink static files
-static/
+static/*
 
 # IDE
 .vscode/
