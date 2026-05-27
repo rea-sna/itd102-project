@@ -33,7 +33,7 @@ _DOWN_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "down.mp
 _UP_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "up.mp3")
 _SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
-# ── ランタイム設定 (settings.json で上書き可能) ───────────────────────────
+# ── Runtime settings (can be overridden via settings.json) ──────────────────
 _runtime = {
     "location": LOCATION_NAME,
     "p1_stops": sorted(PLATFORM_1_STOP_IDS),
@@ -72,24 +72,51 @@ app = Flask(__name__)
 
 GTFS_RT_URL     = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/tripupdates"
 GTFS_STATIC_URL = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip"
+GTFS_STATIC_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "gtfs_static.zip")
 
-# ── 静的 GTFS ルックアップ ──────────────────────────────────────────────────
+# ── Static GTFS lookup ───────────────────────────────────────────────────────
 _static = {
-    "route_name": {},
-    "headsign":   {},
-    "loaded":     False,
+    "route_name":      {},
+    "route_long_name": {},
+    "headsign":        {},
+    "loaded":          False,
 }
+
+def _gtfs_cache_valid() -> bool:
+    """Check whether today falls within the valid date range in the cached feed_info.txt."""
+    if not os.path.exists(GTFS_STATIC_CACHE):
+        return False
+    try:
+        with zipfile.ZipFile(GTFS_STATIC_CACHE) as zf:
+            with zf.open("feed_info.txt") as f:
+                for row in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig")):
+                    start = datetime.strptime(row["feed_start_date"], "%Y%m%d").date()
+                    end   = datetime.strptime(row["feed_end_date"],   "%Y%m%d").date()
+                    today = datetime.now().date()
+                    return start <= today <= end
+    except Exception:
+        return False
+    return False
 
 def _load_static_gtfs():
     try:
-        print("[GTFS] Downloading static feed…")
-        resp = requests.get(GTFS_STATIC_URL, timeout=60)
-        resp.raise_for_status()
+        if _gtfs_cache_valid():
+            print("[GTFS] Cache is valid, skipping download.")
+            with open(GTFS_STATIC_CACHE, "rb") as f:
+                zip_bytes = f.read()
+        else:
+            print("[GTFS] Downloading static feed…")
+            resp = requests.get(GTFS_STATIC_URL, timeout=60)
+            resp.raise_for_status()
+            zip_bytes = resp.content
+            with open(GTFS_STATIC_CACHE, "wb") as f:
+                f.write(zip_bytes)
 
-        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             with zf.open("routes.txt") as f:
                 for row in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig")):
                     _static["route_name"][row["route_id"]] = row.get("route_short_name") or row["route_id"]
+                    _static["route_long_name"][row["route_id"]] = row.get("route_long_name", "")
 
             with zf.open("trips.txt") as f:
                 for row in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig")):
@@ -104,7 +131,7 @@ def _load_static_gtfs():
 threading.Thread(target=_load_static_gtfs, daemon=True).start()
 
 
-# ── リアルタイムキャッシュ ────────────────────────────────────────────────
+# ── Realtime cache ───────────────────────────────────────────────────────────
 _cache = {
     "p1":         [],
     "p2":         [],
@@ -112,7 +139,7 @@ _cache = {
     "error":      None,
 }
 
-# ── サーバー側アナウンスループ (native.py の _tick と同等) ────────────────
+# ── Server-side announcement loop (equivalent to _tick in native.py) ─────────
 _alerted: set[int] = set()
 
 def _announcement_loop():
@@ -129,7 +156,7 @@ def _announcement_loop():
                         args=(dep["route"], dep.get("headsign", ""), platform),
                         daemon=True,
                     ).start()
-        # 180秒以上過去のエントリを掃除
+        # Purge entries older than 180 seconds
         stale = {ts for ts in _alerted if ts < now_ts - 180}
         _alerted.difference_update(stale)
 
@@ -145,8 +172,9 @@ def _parse_feed(content: bytes, stop_ids: set) -> list[dict]:
             continue
 
         tu         = entity.trip_update
-        route_name = _static["route_name"].get(tu.trip.route_id, tu.trip.route_id)
-        headsign   = _static["headsign"].get(tu.trip.trip_id, "")
+        route_name    = _static["route_name"].get(tu.trip.route_id, tu.trip.route_id)
+        route_long    = _static["route_long_name"].get(tu.trip.route_id, "")
+        headsign      = _static["headsign"].get(tu.trip.trip_id, "")
 
         for stu in tu.stop_time_update:
             if stu.stop_id not in stop_ids:
@@ -163,10 +191,11 @@ def _parse_feed(content: bytes, stop_ids: set) -> list[dict]:
                 continue
 
             results.append({
-                "route":      route_name,
-                "headsign":   headsign,
-                "arrival_ts": arr_ts,
-                "scheduled":  datetime.fromtimestamp(arr_ts).strftime("%H:%M"),
+                "route":        route_name,
+                "headsign":     headsign,
+                "service_type": route_long,
+                "arrival_ts":   arr_ts,
+                "scheduled":    datetime.fromtimestamp(arr_ts).strftime("%H:%M"),
             })
 
     results.sort(key=lambda x: x["arrival_ts"])
@@ -179,7 +208,7 @@ def _fetch_all():
         return
 
     if not _PROTO_OK:
-        _cache["error"] = "gtfs-realtime-bindings が未インストールです"
+        _cache["error"] = "gtfs-realtime-bindings is not installed"
         return
 
     try:
@@ -194,14 +223,14 @@ def _fetch_all():
         _cache["error"]      = None
 
     except requests.exceptions.HTTPError as e:
-        _cache["error"] = f"API エラー: {e.response.status_code}"
+        _cache["error"] = f"API error: {e.response.status_code}"
     except requests.exceptions.Timeout:
-        _cache["error"] = "API タイムアウト"
+        _cache["error"] = "API timeout"
     except Exception as e:
-        _cache["error"] = f"取得エラー: {type(e).__name__}"
+        _cache["error"] = f"Fetch error: {type(e).__name__}"
 
 
-# ── TTS / チャイム ────────────────────────────────────────────────────────
+# ── TTS / chime ──────────────────────────────────────────────────────────────
 _VOICE_FOR_PLATFORM = {
     1: "en-AU-Neural2-D",  # male
     2: "en-AU-Neural2-A",  # female
@@ -240,7 +269,7 @@ def _do_announce(route: str, headsign: str, platform: int = 1):
     except KeyError:
         speech_text = f"Bus {route} arriving soon."
 
-    # TTS合成とチャイム再生を並行して実行し、チャイム終了後すぐ再生
+    # Synthesise TTS and play chime in parallel; play TTS immediately after chime ends
     tmp_path = None
     tts_error = [None]
 
@@ -272,9 +301,9 @@ def _do_announce(route: str, headsign: str, platform: int = 1):
     tts_thread = threading.Thread(target=_fetch_tts, daemon=True)
     tts_thread.start()
 
-    _play_file(_SOUND_FILE, CHIME_VOLUME)  # チャイム再生（TTS合成と並行）
+    _play_file(_SOUND_FILE, CHIME_VOLUME)  # play chime (concurrent with TTS synthesis)
 
-    tts_thread.join()  # チャイム終了時点でTTSが揃っていれば待ち時間ゼロ
+    tts_thread.join()  # zero wait if TTS finished before chime ended
     if tmp_path:
         try:
             _play_file(tmp_path, ANNOUNCE_VOLUME)
@@ -282,7 +311,7 @@ def _do_announce(route: str, headsign: str, platform: int = 1):
             os.unlink(tmp_path)
 
 
-# ── ルーティング ──────────────────────────────────────────────────────────
+# ── Routes ───────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html", location=_runtime["location"])
@@ -402,7 +431,7 @@ def api_tts():
 @app.route("/api/debug/stops")
 def debug_stops():
     if not _PROTO_OK:
-        return jsonify({"error": "gtfs-realtime-bindings 未インストール"}), 500
+        return jsonify({"error": "gtfs-realtime-bindings not installed"}), 500
     try:
         resp = requests.get(GTFS_RT_URL, timeout=15,
                             headers={"Accept": "application/x-protobuf"})

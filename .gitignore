@@ -15,11 +15,14 @@ sdist/
 wheels/
 *.so
 
-# 仮想環境
+# Virtual Environments
 .venv/
 venv/
 env/
 ENV/
+
+# exclude translink static files
+static/
 
 # IDE
 .vscode/
@@ -33,11 +36,12 @@ ENV/
 .AppleDouble
 .LSOverride
 
-# ログ・一時ファイル
+# Logs and temporary files
 *.log
 *.tmp
+debug/
 
-# 環境変数・秘密情報
+# Environment variables and secret information
 .env
 .env.*
 secrets.py

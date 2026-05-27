@@ -1,0 +1,13 @@
+{
+  "location": "QUT Kelvin Grove",
+  "p1_stops": [
+    "884"
+  ],
+  "p2_stops": [
+    "889"
+  ],
+  "p1_label": "Platform 1 - Roma Street, City, Woolloongabba, UQ Lakes",
+  "p2_label": "Platform 2 - RBWH, Carseldine, Chermside, Bracken Ridge",
+  "announce_template": "Bus {route} to {headsign}, arriving soon.",
+  "announce_template_no_headsign": "Bus {route}, arriving soon."
+}

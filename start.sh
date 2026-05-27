@@ -1,28 +1,28 @@
 #!/bin/bash
-# TransLink サイネージ起動スクリプト (Raspberry Pi 3 用)
+# TransLink signage launch script (Raspberry Pi 3)
 #
-# 使い方:
+# Usage:
 #   chmod +x start.sh
 #   ./start.sh
 #
-# 自動起動 (crontab) に登録する場合:
+# To run on boot via crontab:
 #   @reboot sleep 10 && /path/to/start.sh
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# RPi でデスクトップ外から起動する場合に必要
+# Required when launching outside a desktop session on RPi
 export DISPLAY="${DISPLAY:-:0}"
 
-# 仮想環境がなければ作成
+# Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
-  echo "仮想環境を作成中..."
+  echo "Creating virtual environment..."
   python3 -m venv venv
   venv/bin/pip install --upgrade pip
   venv/bin/pip install -r requirements.txt
 fi
 
-# ネイティブ Tkinter アプリを起動
-echo "TransLink サイネージを起動中..."
+# Launch the native Tkinter app
+echo "Starting TransLink signage..."
 exec venv/bin/python native.py

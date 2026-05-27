@@ -1,27 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ location }} - Departures</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:         #080c10;
-      --header-bg:  #0d2244;
-      --accent:     #1a56a8;
-      --green:      #22c55e;
-      --amber:      #f59e0b;
-      --red:        #ef4444;
-      --text:       #e8edf2;
-      --muted:      #6b7280;
-      --border:     #1a2030;
-      --table-head: #0d1520;
-      --status-bg:  #05090e;
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
-    html, body {
+    :root {
+      --bg: #080c10;
+      --header-bg: #0d2244;
+      --accent: #1a56a8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --text: #e8edf2;
+      --muted: #6b7280;
+      --border: #1a2030;
+      --table-head: #0d1520;
+      --status-bg: #05090e;
+    }
+
+    html,
+    body {
       height: 100%;
       overflow: hidden;
       background: var(--bg);
@@ -37,7 +45,7 @@
     /* ─── Header ─── */
     header {
       background: var(--header-bg);
-      padding: 14px 28px;
+      padding: 8px 17px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -73,7 +81,7 @@
       min-width: 0;
     }
 
-    .panel + .panel {
+    .panel+.panel {
       border-left: 3px solid var(--accent);
     }
 
@@ -83,7 +91,7 @@
       color: #fff;
       font-size: clamp(1rem, 1.8vw, 1.5rem);
       font-weight: 700;
-      padding: 12px 22px;
+      padding: 12px 17px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -116,14 +124,30 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .col-route    { width: 14%; }
-    .col-dest     { width: 44%; }
-    .col-sched    { width: 16%; }
-    .col-arriving { width: 26%; text-align: right; }
+    .col-route {
+      width: 15%;
+    }
 
-    thead th.col-arriving { text-align: right; }
+    .col-dest {
+      width: 52%;
+    }
 
-    tbody tr { border-bottom: 1px solid var(--border); }
+    .col-sched {
+      width: 8%;
+    }
+
+    .col-arriving {
+      width: 25%;
+      text-align: right;
+    }
+
+    thead th.col-arriving {
+      text-align: right;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+    }
 
     tbody td {
       padding: clamp(10px, 2vh, 22px) 18px;
@@ -143,6 +167,21 @@
       min-width: 56px;
     }
 
+    /* ─── Destination cell ─── */
+    .dest-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .dest-type {
+      font-size: clamp(0.65rem, 1.1vw, 0.95rem);
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* ─── Scrolling destination text ─── */
     .dest-wrap {
       overflow: hidden;
@@ -154,12 +193,20 @@
     }
 
     .dest-wrap.scrolling .dest-inner {
-      animation: marquee-text var(--marquee-dur, 12s) ease-in-out infinite;
+      animation: marquee-loop var(--marquee-dur, 12s) linear infinite;
     }
 
-    @keyframes marquee-text {
-      0%,  20% { transform: translateX(0); }
-      80%, 100% { transform: translateX(var(--marquee-dist, 0px)); }
+    @keyframes marquee-loop {
+
+      0%,
+      20% {
+        transform: translateX(0);
+      }
+
+      80%,
+      100% {
+        transform: translateX(-50%);
+      }
     }
 
     /* ─── Arriving column ─── */
@@ -171,13 +218,29 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .arriving.green { color: var(--green); }
-    .arriving.amber { color: var(--amber); }
-    .arriving.red   { color: var(--red); }
-    /* NOW only blinks */
-    .arriving.now   { color: var(--red); animation: blink 1s step-end infinite; }
+    .arriving.green {
+      color: var(--green);
+    }
 
-    @keyframes blink { 50% { opacity: 0; } }
+    .arriving.amber {
+      color: var(--amber);
+    }
+
+    .arriving.red {
+      color: var(--red);
+    }
+
+    /* NOW only blinks */
+    .arriving.now {
+      color: var(--red);
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
 
     /* ─── Filler rows ─── */
     .filler-row td {
@@ -207,286 +270,313 @@
       flex-shrink: 0;
     }
 
-    .status-bar .error { color: var(--red); }
+    .status-bar .error {
+      color: var(--red);
+    }
   </style>
 </head>
+
 <body>
 
-<header>
-  <div class="location-name">{{ location }}</div>
-  <div class="clock" id="clock">--:--:--</div>
-</header>
+  <header>
+    <div class="location-name">{{ location }}</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
 
-<div class="main">
-  <div class="panel">
-    <div class="platform-banner" id="p1-banner">Platform 1</div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th class="col-route">Route</th>
-            <th class="col-dest">Destination</th>
-            <th class="col-sched">Sched.</th>
-            <th class="col-arriving">Arriving</th>
-          </tr>
-        </thead>
-        <tbody id="p1-tbody">
-          <tr><td colspan="4"><div class="no-service">Loading&hellip;</div></td></tr>
-        </tbody>
-      </table>
+  <div class="main">
+    <div class="panel">
+      <div class="platform-banner" id="p1-banner">Platform 1</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-route">Route</th>
+              <th class="col-dest">Destination</th>
+              <th class="col-sched">Sched.</th>
+              <th class="col-arriving">Arriving</th>
+            </tr>
+          </thead>
+          <tbody id="p1-tbody">
+            <tr>
+              <td colspan="4">
+                <div class="no-service">Loading&hellip;</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="platform-banner" id="p2-banner">Platform 2</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-route">Route</th>
+              <th class="col-dest">Destination</th>
+              <th class="col-sched">Sched.</th>
+              <th class="col-arriving">Arriving</th>
+            </tr>
+          </thead>
+          <tbody id="p2-tbody">
+            <tr>
+              <td colspan="4">
+                <div class="no-service">Loading&hellip;</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="platform-banner" id="p2-banner">Platform 2</div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th class="col-route">Route</th>
-            <th class="col-dest">Destination</th>
-            <th class="col-sched">Sched.</th>
-            <th class="col-arriving">Arriving</th>
-          </tr>
-        </thead>
-        <tbody id="p2-tbody">
-          <tr><td colspan="4"><div class="no-service">Loading&hellip;</div></td></tr>
-        </tbody>
-      </table>
-    </div>
+  <div class="status-bar">
+    <span id="status-left">Connecting&hellip;</span>
+    <span>TransLink Open Data</span>
   </div>
-</div>
 
-<div class="status-bar">
-  <span id="status-left">Connecting&hellip;</span>
-  <span>TransLink Open Data</span>
-</div>
+  <script>
+    // ── Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent =
+        [now.getHours(), now.getMinutes(), now.getSeconds()]
+          .map(n => String(n).padStart(2, '0')).join(':');
+    }
 
-<script>
-  // ── Clock
-  function updateClock() {
-    const now = new Date();
-    document.getElementById('clock').textContent =
-      [now.getHours(), now.getMinutes(), now.getSeconds()]
-        .map(n => String(n).padStart(2, '0')).join(':');
-  }
+    // ── Format arrival (mirrors native.py logic)
+    function formatArrival(arrTs) {
+      const diff = arrTs - Math.floor(Date.now() / 1000);
+      if (diff <= 0) return { text: 'NOW', cls: 'now' };
+      if (diff < 120) return { text: `${Math.ceil(diff / 60)} min`, cls: 'red' };
+      if (diff < 300) return { text: `${Math.ceil(diff / 60)} min`, cls: 'amber' };
+      return { text: `${Math.floor(diff / 60)} min`, cls: 'green' };
+    }
 
-  // ── Format arrival (mirrors native.py logic)
-  function formatArrival(arrTs) {
-    const diff = arrTs - Math.floor(Date.now() / 1000);
-    if (diff <= 0)   return { text: 'NOW',                         cls: 'now'   };
-    if (diff < 120)  return { text: `${Math.ceil(diff / 60)} min`, cls: 'red'   };
-    if (diff < 300)  return { text: `${Math.ceil(diff / 60)} min`, cls: 'amber' };
-    return                  { text: `${Math.floor(diff / 60)} min`, cls: 'green' };
-  }
+    const SERVICE_TYPE_KEYWORDS = ['buz', 'express', 'rocket', 'nightlink', 'loop', 'city precincts'];
 
-  function escHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+    function serviceTypeLabel(serviceType) {
+      if (!serviceType) return '';
+      const lower = serviceType.toLowerCase();
+      if (!SERVICE_TYPE_KEYWORDS.some(kw => lower.includes(kw))) return '';
+      return `<div class="dest-type">${escHtml(serviceType)}</div>`;
+    }
 
-  // ── Apply marquee to overflowing destination cells
-  function applyScrolling(tbody) {
-    tbody.querySelectorAll('.dest-wrap').forEach(wrap => {
-      const inner = wrap.querySelector('.dest-inner');
-      if (!inner) return;
-      const overflow = inner.scrollWidth - wrap.clientWidth;
-      if (overflow > 4) {
-        const dur = Math.max(8, overflow / 30);
-        wrap.style.setProperty('--marquee-dist', `${-overflow}px`);
-        wrap.style.setProperty('--marquee-dur',  `${dur}s`);
-        wrap.classList.add('scrolling');
-      } else {
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ── Apply marquee to overflowing destination cells
+    function applyScrolling(tbody) {
+      tbody.querySelectorAll('.dest-wrap').forEach(wrap => {
+        const inner = wrap.querySelector('.dest-inner');
+        if (!inner) return;
+
+        // Restore original text before measuring (handles resize re-calls)
+        if (inner.dataset.orig !== undefined) {
+          inner.textContent = inner.dataset.orig;
+        }
         wrap.classList.remove('scrolling');
-        wrap.style.removeProperty('--marquee-dist');
         wrap.style.removeProperty('--marquee-dur');
-      }
-    });
-  }
 
-  const MIN_ROWS = 8;
+        const overflow = inner.scrollWidth - wrap.clientWidth;
+        if (overflow > 4) {
+          const orig = inner.textContent;
+          inner.dataset.orig = orig;
+          // Duplicate with a gap so the loop is seamless
+          inner.innerHTML = escHtml(orig) + '<span style="display:inline-block;min-width:4em"></span>'
+            + escHtml(orig) + '<span style="display:inline-block;min-width:4em"></span>';
+          // 60% of total duration is scrolling at 60px/s; 20% pause at each end
+          const dur = Math.max(8, (inner.scrollWidth / 2) / 60 / 0.60);
+          wrap.style.setProperty('--marquee-dur', `${dur}s`);
+          wrap.classList.add('scrolling');
+        }
+      });
+    }
 
-  // ── Render one platform panel
-  function renderPanel(tbodyId, bannerId, deps, label) {
-    document.getElementById(bannerId).textContent = label;
-    const tbody = document.getElementById(tbodyId);
+    const MIN_ROWS = 8;
 
-    const rows = [];
+    // ── Render one platform panel
+    function renderPanel(tbodyId, bannerId, deps, label) {
+      document.getElementById(bannerId).textContent = label;
+      const tbody = document.getElementById(tbodyId);
 
-    if (!deps || deps.length === 0) {
-      rows.push('<tr><td colspan="4"><div class="no-service">No upcoming services</div></td></tr>');
-      for (let i = 1; i < MIN_ROWS; i++) {
-        rows.push('<tr class="filler-row"><td colspan="4"></td></tr>');
-      }
-    } else {
-      rows.push(...deps.map(d => {
-        const { text, cls } = formatArrival(d.arrival_ts);
-        return `<tr data-ts="${d.arrival_ts}" data-route="${escHtml(d.route)}" data-headsign="${escHtml(d.headsign || '')}">
+      const rows = [];
+
+      if (!deps || deps.length === 0) {
+        rows.push('<tr><td colspan="4"><div class="no-service">No upcoming services</div></td></tr>');
+      } else {
+        rows.push(...deps.map(d => {
+          const { text, cls } = formatArrival(d.arrival_ts);
+          return `<tr data-ts="${d.arrival_ts}" data-route="${escHtml(d.route)}" data-headsign="${escHtml(d.headsign || '')}">
         <td><span class="route-badge">${escHtml(d.route)}</span></td>
-        <td><div class="dest-wrap"><span class="dest-inner">${escHtml(d.headsign || '—')}</span></div></td>
+        <td><div class="dest-cell"><div class="dest-wrap"><span class="dest-inner">${escHtml(d.headsign || '—')}</span></div>${serviceTypeLabel(d.service_type)}</div></td>
         <td>${escHtml(d.scheduled)}</td>
         <td><span class="arriving ${cls}" data-arrival>${text}</span></td>
       </tr>`;
-      }));
-      for (let i = deps.length; i < MIN_ROWS; i++) {
-        rows.push('<tr class="filler-row"><td colspan="4"></td></tr>');
+        }));
+        for (let i = deps.length; i < MIN_ROWS; i++) {
+          rows.push('<tr class="filler-row"><td colspan="4"></td></tr>');
+        }
+      }
+
+      tbody.innerHTML = rows.join('');
+      requestAnimationFrame(() => applyScrolling(tbody));
+    }
+
+    // ── Audio Announcements
+    let _lastDeps = [];
+    let _audioReady = false;
+    const _clientAlerted = new Map();   // key → alerted_at_ts
+    const _announceQueue = [];
+    let _announcePlaying = false;
+    let _announceTemplate = 'Bus {route} to {headsign}, arriving in 1 minute.';
+    let _announceTemplateNoHeadsign = 'Bus {route}, arriving in 1 minute.';
+
+    async function _loadTemplates() {
+      try {
+        const resp = await fetch('/api/settings');
+        if (!resp.ok) return;
+        const s = await resp.json();
+        if (s.announce_template) _announceTemplate = s.announce_template;
+        if (s.announce_template_no_headsign) _announceTemplateNoHeadsign = s.announce_template_no_headsign;
+      } catch (e) { }
+    }
+    _loadTemplates();
+
+    function _unlockAudio() {
+      if (_audioReady) return;
+      _audioReady = true;
+      const badge = document.getElementById('audio-badge');
+      if (badge) badge.remove();
+    }
+
+    function _drainQueue() {
+      if (_announcePlaying || _announceQueue.length === 0) return;
+      const { route, headsign, platform } = _announceQueue.shift();
+      _announcePlaying = true;
+
+      const chimeUrl = platform === 2 ? '/audio/chime/up' : '/audio/chime/down';
+      const tmpl = headsign ? _announceTemplate : _announceTemplateNoHeadsign;
+      const text = tmpl.replace('{route}', route).replace('{headsign}', headsign);
+      const ttsUrl = '/api/tts?' + new URLSearchParams({ text, platform: String(platform) });
+
+      // Prefetch TTS in parallel with the chime
+      const tts = new Audio(ttsUrl);
+      tts.preload = 'auto';
+      tts.load();
+
+      const chime = new Audio(chimeUrl);
+      chime.play().catch(() => { _announcePlaying = false; _drainQueue(); });
+      chime.addEventListener('ended', () => {
+        tts.play().catch(() => { _announcePlaying = false; _drainQueue(); });
+        tts.addEventListener('ended', () => { _announcePlaying = false; _drainQueue(); });
+      });
+    }
+
+    function _checkAnnouncements() {
+      if (!_audioReady) return;
+      const nowTs = Math.floor(Date.now() / 1000);
+      for (const dep of _lastDeps) {
+        const diff = dep.arrival_ts - nowTs;
+        // Key by route+scheduled (stable across API refreshes) instead of arrival_ts
+        const key = `${dep.route}|${dep.scheduled}`;
+        if (diff > 0 && diff <= 60 && !_clientAlerted.has(key)) {
+          _clientAlerted.set(key, nowTs);
+          _announceQueue.push({ route: dep.route, headsign: dep.headsign || '', platform: dep._platform });
+          _drainQueue();
+        }
+      }
+      for (const [key, alertedAt] of _clientAlerted) {
+        if (alertedAt < nowTs - 300) _clientAlerted.delete(key);
       }
     }
 
-    tbody.innerHTML = rows.join('');
-    requestAnimationFrame(() => applyScrolling(tbody));
-  }
+    // Non-intrusive audio unlock badge (hidden if kiosk auto-unlock succeeds)
+    (function () {
+      const badge = document.createElement('span');
+      badge.id = 'audio-badge';
+      badge.style.cssText = 'cursor:pointer;color:var(--amber);margin-left:1rem;';
+      badge.textContent = '[click to enable audio]';
+      badge.addEventListener('click', _unlockAudio);
+      const sl = document.getElementById('status-left');
+      sl.parentNode.insertBefore(badge, sl.nextSibling);
+    })();
 
-  // ── Audio Announcements
-  let _lastDeps    = [];
-  let _audioReady  = false;
-  const _clientAlerted  = new Map();   // key → alerted_at_ts
-  const _announceQueue  = [];
-  let   _announcePlaying = false;
-  let _announceTemplate          = 'Bus {route} to {headsign}, arriving in 1 minute.';
-  let _announceTemplateNoHeadsign = 'Bus {route}, arriving in 1 minute.';
+    document.addEventListener('click', _unlockAudio, { once: true });
 
-  async function _loadTemplates() {
-    try {
-      const resp = await fetch('/api/settings');
-      if (!resp.ok) return;
-      const s = await resp.json();
-      if (s.announce_template)             _announceTemplate           = s.announce_template;
-      if (s.announce_template_no_headsign) _announceTemplateNoHeadsign = s.announce_template_no_headsign;
-    } catch (e) {}
-  }
-  _loadTemplates();
+    // Auto-unlock for kiosk / browsers with autoplay allowed
+    (async () => {
+      try {
+        const a = new Audio('/audio/chime');
+        a.volume = 0;
+        await a.play();
+        a.pause();
+        _unlockAudio();
+      } catch (e) { }
+    })();
 
-  function _unlockAudio() {
-    if (_audioReady) return;
-    _audioReady = true;
-    const badge = document.getElementById('audio-badge');
-    if (badge) badge.remove();
-  }
+    // ── Per-second arrival tick (avoids full re-render)
+    function tickArrival() {
+      document.querySelectorAll('tr[data-ts]').forEach(row => {
+        const span = row.querySelector('[data-arrival]');
+        if (!span) return;
+        const { text, cls } = formatArrival(parseInt(row.dataset.ts, 10));
+        span.textContent = text;
+        span.className = `arriving ${cls}`;
+      });
+      _checkAnnouncements();
+    }
 
-  function _drainQueue() {
-    if (_announcePlaying || _announceQueue.length === 0) return;
-    const { route, headsign, platform } = _announceQueue.shift();
-    _announcePlaying = true;
+    // ── Re-check scrolling on window resize
+    function onResize() {
+      ['p1-tbody', 'p2-tbody'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) applyScrolling(el);
+      });
+    }
+    window.addEventListener('resize', onResize);
 
-    const chimeUrl = platform === 2 ? '/audio/chime/up' : '/audio/chime/down';
-    const tmpl = headsign ? _announceTemplate : _announceTemplateNoHeadsign;
-    const text = tmpl.replace('{route}', route).replace('{headsign}', headsign);
-    const ttsUrl = '/api/tts?' + new URLSearchParams({ text, platform: String(platform) });
+    // ── Fetch from Flask API
+    async function fetchData() {
+      try {
+        const resp = await fetch('/api/departures');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
 
-    // チャイムと並行してTTSをプリフェッチ
-    const tts = new Audio(ttsUrl);
-    tts.preload = 'auto';
-    tts.load();
+        renderPanel('p1-tbody', 'p1-banner', data.p1, data.p1_label || 'Platform 1');
+        renderPanel('p2-tbody', 'p2-banner', data.p2, data.p2_label || 'Platform 2');
+        _lastDeps = [
+          ...(data.p1 || []).map(d => ({ ...d, _platform: 1 })),
+          ...(data.p2 || []).map(d => ({ ...d, _platform: 2 })),
+        ];
 
-    const chime = new Audio(chimeUrl);
-    chime.play().catch(() => { _announcePlaying = false; _drainQueue(); });
-    chime.addEventListener('ended', () => {
-      tts.play().catch(() => { _announcePlaying = false; _drainQueue(); });
-      tts.addEventListener('ended', () => { _announcePlaying = false; _drainQueue(); });
-    });
-  }
-
-  function _checkAnnouncements() {
-    if (!_audioReady) return;
-    const nowTs = Math.floor(Date.now() / 1000);
-    for (const dep of _lastDeps) {
-      const diff = dep.arrival_ts - nowTs;
-      // Key by route+scheduled (stable across API refreshes) instead of arrival_ts
-      const key = `${dep.route}|${dep.scheduled}`;
-      if (diff > 0 && diff <= 60 && !_clientAlerted.has(key)) {
-        _clientAlerted.set(key, nowTs);
-        _announceQueue.push({ route: dep.route, headsign: dep.headsign || '', platform: dep._platform });
-        _drainQueue();
+        const el = document.getElementById('status-left');
+        if (data.error) {
+          el.textContent = `Error: ${data.error}`;
+          el.className = 'error';
+        } else {
+          const stops = (data.stop_ids || []).join(', ');
+          el.textContent = `Updated: ${data.updated}  |  Stops: ${stops}`;
+          el.className = '';
+        }
+      } catch (e) {
+        const el = document.getElementById('status-left');
+        el.textContent = 'Connection error — retrying…';
+        el.className = 'error';
       }
     }
-    for (const [key, alertedAt] of _clientAlerted) {
-      if (alertedAt < nowTs - 300) _clientAlerted.delete(key);
-    }
-  }
 
-  // Non-intrusive audio unlock badge (hidden if kiosk auto-unlock succeeds)
-  (function () {
-    const badge = document.createElement('span');
-    badge.id = 'audio-badge';
-    badge.style.cssText = 'cursor:pointer;color:var(--amber);margin-left:1rem;';
-    badge.textContent = '[click to enable audio]';
-    badge.addEventListener('click', _unlockAudio);
-    const sl = document.getElementById('status-left');
-    sl.parentNode.insertBefore(badge, sl.nextSibling);
-  })();
+    // ── Init
+    updateClock();
+    setInterval(updateClock, 1000);
+    setInterval(tickArrival, 1000);
 
-  document.addEventListener('click', _unlockAudio, { once: true });
-
-  // Auto-unlock for kiosk / browsers with autoplay allowed
-  (async () => {
-    try {
-      const a = new Audio('/audio/chime');
-      a.volume = 0;
-      await a.play();
-      a.pause();
-      _unlockAudio();
-    } catch (e) {}
-  })();
-
-  // ── Per-second arrival tick (avoids full re-render)
-  function tickArrival() {
-    document.querySelectorAll('tr[data-ts]').forEach(row => {
-      const span = row.querySelector('[data-arrival]');
-      if (!span) return;
-      const { text, cls } = formatArrival(parseInt(row.dataset.ts, 10));
-      span.textContent = text;
-      span.className   = `arriving ${cls}`;
-    });
-    _checkAnnouncements();
-  }
-
-  // ── Re-check scrolling on window resize
-  function onResize() {
-    ['p1-tbody', 'p2-tbody'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) applyScrolling(el);
-    });
-  }
-  window.addEventListener('resize', onResize);
-
-  // ── Fetch from Flask API
-  async function fetchData() {
-    try {
-      const resp = await fetch('/api/departures');
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-
-      renderPanel('p1-tbody', 'p1-banner', data.p1, data.p1_label || 'Platform 1');
-      renderPanel('p2-tbody', 'p2-banner', data.p2, data.p2_label || 'Platform 2');
-      _lastDeps = [
-        ...(data.p1 || []).map(d => ({ ...d, _platform: 1 })),
-        ...(data.p2 || []).map(d => ({ ...d, _platform: 2 })),
-      ];
-
-      const el = document.getElementById('status-left');
-      if (data.error) {
-        el.textContent = `Error: ${data.error}`;
-        el.className   = 'error';
-      } else {
-        const stops = (data.stop_ids || []).join(', ');
-        el.textContent = `Updated: ${data.updated}  |  Stops: ${stops}`;
-        el.className   = '';
-      }
-    } catch (e) {
-      const el = document.getElementById('status-left');
-      el.textContent = 'Connection error — retrying…';
-      el.className   = 'error';
-    }
-  }
-
-  // ── Init
-  updateClock();
-  setInterval(updateClock,  1000);
-  setInterval(tickArrival,  1000);
-
-  fetchData();
-  setInterval(fetchData, 30000);
-</script>
+    fetchData();
+    setInterval(fetchData, 30000);
+  </script>
 </body>
+
 </html>

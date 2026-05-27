@@ -1,11 +1,9 @@
 """
-GTFS-RT フィード内の stop_id を調べるデバッグ用スクリプト。
+Debug script for inspecting stop_id values in the GTFS-RT feed.
 
-使い方:
-  python find_stops.py --keyword "kelvin"   # 停留所名で検索
-  python find_stops.py --live               # GTFS-RT に実際に現れる stop_id を一覧
-
-事前に config.py の API_KEY を設定してください。
+Usage:
+  python find_stops.py --keyword "kelvin"   # search stops by name
+  python find_stops.py --live               # list stop_ids seen in the live GTFS-RT feed
 """
 import argparse
 import sys
@@ -15,15 +13,15 @@ import requests
 try:
     from google.transit import gtfs_realtime_pb2
 except ImportError:
-    sys.exit("gtfs-realtime-bindings が必要です: pip install gtfs-realtime-bindings")
+    sys.exit("gtfs-realtime-bindings is required: pip install gtfs-realtime-bindings")
 
 GTFS_RT_URL = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/tripupdates"
 GTFS_STOPS_URL = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip"
 
 
 def live_stop_ids(limit=200):
-    """GTFS-RT フィードから実際に使われている stop_id を収集する"""
-    print("GTFS-RT フィードを取得中...")
+    """Collect stop_ids currently present in the GTFS-RT feed."""
+    print("Fetching GTFS-RT feed...")
     resp = requests.get(GTFS_RT_URL, timeout=15,
                         headers={"Accept": "application/x-protobuf"})
     resp.raise_for_status()
@@ -44,9 +42,9 @@ def live_stop_ids(limit=200):
 
 
 def search_gtfs_stops(keyword: str):
-    """静的 GTFS の stops.txt からキーワードに一致する停留所を表示する"""
+    """Search stops.txt in the static GTFS for stops matching the given keyword."""
     import io, zipfile
-    print(f"GTFS static データを取得中 (大きいファイルです)...")
+    print(f"Fetching static GTFS data (large file)...")
     resp = requests.get(GTFS_STOPS_URL, timeout=60, stream=True)
     resp.raise_for_status()
 
@@ -63,7 +61,7 @@ def search_gtfs_stops(keyword: str):
     name_idx = header.index("stop_name")
 
     kw = keyword.lower()
-    print(f"\n--- '{keyword}' を含む停留所 ---")
+    print(f"\n--- Stops containing '{keyword}' ---")
     found = 0
     for line in lines[1:]:
         parts = line.split(",")
@@ -72,26 +70,26 @@ def search_gtfs_stops(keyword: str):
         if kw in parts[name_idx].lower():
             print(f"  stop_id={parts[id_idx]:<20}  name={parts[name_idx]}")
             found += 1
-    print(f"({found} 件)")
+    print(f"({found} result(s))")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--live",    action="store_true", help="GTFS-RT の stop_id 一覧を表示")
-    parser.add_argument("--keyword", type=str,            help="静的 GTFS を停留所名で検索")
+    parser.add_argument("--live",    action="store_true", help="List stop_ids from the live GTFS-RT feed")
+    parser.add_argument("--keyword", type=str,            help="Search static GTFS stops by name")
     args = parser.parse_args()
 
     if args.live:
         ids = live_stop_ids()
-        print("\n--- GTFS-RT に現れる stop_id (最大200件) ---")
+        print("\n--- stop_ids in GTFS-RT (up to 200) ---")
         for sid in ids:
             print(f"  {sid}")
-        # place_ 形式があるか確認
+        # Check whether place_* format is used
         place_ids = [s for s in ids if s.startswith("place_")]
         if place_ids:
-            print(f"\n>>> place_* 形式: {place_ids}")
+            print(f"\n>>> place_* format detected: {place_ids}")
         else:
-            print("\n>>> GTFS-RT は place_* を使っていません。数値 ID を config.py に設定してください。")
+            print("\n>>> GTFS-RT does not use place_* IDs. Set numeric IDs in config.py.")
     elif args.keyword:
         search_gtfs_stops(args.keyword)
     else:

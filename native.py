@@ -176,6 +176,7 @@ class ScrollingLabel(tk.Canvas):
 
 GTFS_RT_URL     = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/tripupdates"
 GTFS_STATIC_URL = "https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip"
+GTFS_STATIC_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "gtfs_static.zip")
 
 _SOUND_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sound.mp3")
 
@@ -251,12 +252,37 @@ def _announce(dep: dict):
 # ── Static GTFS ───────────────────────────────────────────────────────────────
 _static = {"route_name": {}, "headsign": {}, "loaded": False}
 
+def _gtfs_cache_valid() -> bool:
+    """Check whether today falls within the valid date range in the cached feed_info.txt."""
+    if not os.path.exists(GTFS_STATIC_CACHE):
+        return False
+    try:
+        with zipfile.ZipFile(GTFS_STATIC_CACHE) as zf:
+            with zf.open("feed_info.txt") as f:
+                for row in csv.DictReader(io.TextIOWrapper(f, "utf-8-sig")):
+                    start = datetime.strptime(row["feed_start_date"], "%Y%m%d").date()
+                    end   = datetime.strptime(row["feed_end_date"],   "%Y%m%d").date()
+                    today = datetime.now().date()
+                    return start <= today <= end
+    except Exception:
+        return False
+    return False
+
 def _load_static():
     try:
-        print("[GTFS] Downloading static feed…")
-        resp = requests.get(GTFS_STATIC_URL, timeout=60)
-        resp.raise_for_status()
-        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        if _gtfs_cache_valid():
+            print("[GTFS] Cache is valid, skipping download.")
+            with open(GTFS_STATIC_CACHE, "rb") as f:
+                zip_bytes = f.read()
+        else:
+            print("[GTFS] Downloading static feed…")
+            resp = requests.get(GTFS_STATIC_URL, timeout=60)
+            resp.raise_for_status()
+            zip_bytes = resp.content
+            with open(GTFS_STATIC_CACHE, "wb") as f:
+                f.write(zip_bytes)
+
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             with zf.open("routes.txt") as f:
                 for row in csv.DictReader(io.TextIOWrapper(f, "utf-8-sig")):
                     _static["route_name"][row["route_id"]] = (
@@ -340,20 +366,20 @@ class SignageApp(tk.Tk):
         self.title(f"{LOCATION_NAME} — Departures")
         self.configure(bg=BG, cursor="none")
 
-        # キオスクモード: ウィンドウマネージャのボタンで閉じられないようにする
+        # Kiosk mode: prevent closing via window manager button
         self.protocol("WM_DELETE_WINDOW", lambda: None)
 
         if platform.system() == "Linux":
-            # RPi/X11: overrideredirect でタイトルバーを除去し画面全体に張る
+            # RPi/X11: remove title bar and stretch to full screen via overrideredirect
             self.overrideredirect(True)
             self.attributes("-topmost", True)
             self.after(50, self._go_fullscreen)
         else:
-            # macOS: ネイティブフルスクリーン
+            # macOS: native fullscreen
             self.attributes("-fullscreen", True)
             self.attributes("-topmost", True)
 
-        # 終了: Ctrl+Q (開発者用)、フルスクリーン解除: F11
+        # Quit: Ctrl+Q (developer), toggle fullscreen: F11
         self.bind("<Control-q>", lambda _: self.destroy())
         self.bind("<F11>", lambda _: self.attributes(
             "-fullscreen", not self.attributes("-fullscreen")))
@@ -370,7 +396,7 @@ class SignageApp(tk.Tk):
         self._do_fetch()
 
     def _go_fullscreen(self):
-        """Linux/X11 用: スクリーンサイズを取得してジオメトリを設定する。"""
+        """Linux/X11: query screen dimensions and set window geometry to fill the display."""
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
         self.geometry(f"{sw}x{sh}+0+0")
@@ -505,13 +531,13 @@ class SignageApp(tk.Tk):
                     fg=color if not (blink_text and not self._blink_on) else BG,
                 )
 
-        # 1分前アラート: 各バスにつき1回だけ再生
+        # 1-minute alert: play announcement once per bus
         for dep in _cache["p1"] + _cache["p2"]:
             diff = dep["arrival_ts"] - now_ts
             if 0 < diff <= 60 and dep["arrival_ts"] not in self._alerted:
                 self._alerted.add(dep["arrival_ts"])
                 _announce(dep)
-        # 過去の記録を掃除
+        # Purge stale alert records
         self._alerted = {ts for ts in self._alerted if ts > now_ts - 180}
 
         self.after(self.TICK_MS, self._tick)

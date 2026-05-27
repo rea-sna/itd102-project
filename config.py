@@ -1,28 +1,28 @@
-# QUT Kelvin Grove のバス停 ID (プラットフォーム別)
+# QUT Kelvin Grove bus stop IDs (by platform)
 PLATFORM_1_STOP_IDS = {"884"}   # Platform 1 — outbound
 PLATFORM_2_STOP_IDS = {"889"}   # Platform 2 — inbound
 
-PLATFORM_1_LABEL = "Platform 1 - RBWH, Carseldine, Chermside, Bracken Ridge"
-PLATFORM_2_LABEL = "Platform 2 - Roma Street, City, Woolloongabba, UQ Lakes"
+PLATFORM_1_LABEL = "Platform 1 - Roma Street, City, Woolloongabba, UQ Lakes"
+PLATFORM_2_LABEL = "Platform 2 - RBWH, Carseldine, Chermside, Bracken Ridge"
 
-# app.py 後方互換
+# Backward compatibility for app.py
 STOP_IDS = PLATFORM_1_STOP_IDS | PLATFORM_2_STOP_IDS
 
-# プラットフォームごとの最大表示件数 (native.py)
+# Max departures shown per platform (native.py)
 MAX_PER_PLATFORM = 8
-# app.py 用
+# For app.py
 MAX_DEPARTURES = 12
 
-# キャッシュ有効期間 (秒) - RPi 3 の負荷を考慮
+# Cache TTL in seconds — tuned for RPi 3 load
 CACHE_TTL = 30
 
-# Flask サーバー設定
+# Flask server settings
 HOST = "0.0.0.0"
-PORT = 5000
+PORT = 40053
 
-# 表示名
+# Display name
 LOCATION_NAME = "QUT Kelvin Grove"
 
-# 音量設定 (0.0 〜 1.0)
-CHIME_VOLUME    = 0.6   # チャイム音量
-ANNOUNCE_VOLUME = 1.0   # アナウンス音量
+# Volume settings (0.0 – 1.0)
+CHIME_VOLUME    = 0.6   # chime volume
+ANNOUNCE_VOLUME = 1.0   # announcement volume
