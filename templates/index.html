@@ -273,10 +273,52 @@
     .status-bar .error {
       color: var(--red);
     }
+
+    /* ─── Loading overlay ─── */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      z-index: 100;
+      transition: opacity 0.5s ease;
+    }
+
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-spinner {
+      width: 56px;
+      height: 56px;
+      border: 5px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: clamp(1rem, 2vw, 1.4rem);
+      color: var(--muted);
+    }
   </style>
 </head>
 
 <body>
+
+  <div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading GTFS data&hellip;</div>
+  </div>
 
   <header>
     <div class="location-name">{{ location }}</div>
@@ -540,11 +582,22 @@
     window.addEventListener('resize', onResize);
 
     // ── Fetch from Flask API
+    let _pollTimer = null;
+
+    function scheduleNext(gtfsReady) {
+      clearTimeout(_pollTimer);
+      _pollTimer = setTimeout(fetchData, gtfsReady ? 30000 : 2000);
+    }
+
     async function fetchData() {
       try {
         const resp = await fetch('/api/departures');
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
+
+        if (data.gtfs_ready) {
+          document.getElementById('loading-overlay').classList.add('hidden');
+        }
 
         renderPanel('p1-tbody', 'p1-banner', data.p1, data.p1_label || 'Platform 1');
         renderPanel('p2-tbody', 'p2-banner', data.p2, data.p2_label || 'Platform 2');
@@ -562,10 +615,13 @@
           el.textContent = `Updated: ${data.updated}  |  Stops: ${stops}`;
           el.className = '';
         }
+
+        scheduleNext(data.gtfs_ready);
       } catch (e) {
         const el = document.getElementById('status-left');
         el.textContent = 'Connection error — retrying…';
         el.className = 'error';
+        scheduleNext(false);
       }
     }
 
@@ -575,7 +631,6 @@
     setInterval(tickArrival, 1000);
 
     fetchData();
-    setInterval(fetchData, 30000);
   </script>
 </body>
 
