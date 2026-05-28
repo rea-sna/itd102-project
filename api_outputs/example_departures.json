@@ -1,0 +1,127 @@
+{
+  "error": null,
+  "gtfs_ready": true,
+  "p1": [
+    {
+      "arrival_ts": 1779933622,
+      "headsign": "UQ Lakes station",
+      "route": "M2",
+      "scheduled": "12:00",
+      "service_type": "RBWH - UQ Lakes via City"
+    },
+    {
+      "arrival_ts": 1779933952,
+      "headsign": "UQ Lakes station",
+      "route": "M2",
+      "scheduled": "12:05",
+      "service_type": "RBWH - UQ Lakes via City"
+    },
+    {
+      "arrival_ts": 1779934027,
+      "headsign": "Queen Street station",
+      "route": "330",
+      "scheduled": "12:07",
+      "service_type": "Bracken Ridge - City Express"
+    },
+    {
+      "arrival_ts": 1779934252,
+      "headsign": "UQ Lakes station",
+      "route": "M2",
+      "scheduled": "12:10",
+      "service_type": "RBWH - UQ Lakes via City"
+    },
+    {
+      "arrival_ts": 1779934252,
+      "headsign": "Woolloongabba station",
+      "route": "333",
+      "scheduled": "12:10",
+      "service_type": "Chermside - Woolloongabba via City"
+    },
+    {
+      "arrival_ts": 1779934488,
+      "headsign": "Woolloongabba station",
+      "route": "340",
+      "scheduled": "12:14",
+      "service_type": "Carseldine - Woolloongabba Express via City"
+    },
+    {
+      "arrival_ts": 1779934552,
+      "headsign": "UQ Lakes station",
+      "route": "M2",
+      "scheduled": "12:15",
+      "service_type": "RBWH - UQ Lakes via City"
+    },
+    {
+      "arrival_ts": 1779934852,
+      "headsign": "UQ Lakes station",
+      "route": "M2",
+      "scheduled": "12:20",
+      "service_type": "RBWH - UQ Lakes via City"
+    }
+  ],
+  "p1_label": "Platform 1 - Roma Street, City, Woolloongabba, UQ Lakes",
+  "p2": [
+    {
+      "arrival_ts": 1779933857,
+      "headsign": "Chermside Interchange",
+      "route": "333",
+      "scheduled": "12:04",
+      "service_type": "Chermside - Woolloongabba via City"
+    },
+    {
+      "arrival_ts": 1779933895,
+      "headsign": "RBWH station",
+      "route": "M2",
+      "scheduled": "12:04",
+      "service_type": "RBWH - UQ Lakes via City"
+    },
+    {
+      "arrival_ts": 1779933953,
+      "headsign": "Bracken Ridge, Quinlan St",
+      "route": "330",
+      "scheduled": "12:05",
+      "service_type": "Bracken Ridge - City Express"
+    },
+    {
+      "arrival_ts": 1779934136,
+      "headsign": "RBWH station",
+      "route": "M2",
+      "scheduled": "12:08",
+      "service_type": "RBWH - UQ Lakes via City"
+    },
+    {
+      "arrival_ts": 1779934398,
+      "headsign": "RBWH station",
+      "route": "M2",
+      "scheduled": "12:13",
+      "service_type": "RBWH - UQ Lakes via City"
+    },
+    {
+      "arrival_ts": 1779934738,
+      "headsign": "Chermside Interchange",
+      "route": "333",
+      "scheduled": "12:18",
+      "service_type": "Chermside - Woolloongabba via City"
+    },
+    {
+      "arrival_ts": 1779934818,
+      "headsign": "Bracken Ridge, Quinlan St",
+      "route": "330",
+      "scheduled": "12:20",
+      "service_type": "Bracken Ridge - City Express"
+    },
+    {
+      "arrival_ts": 1779934880,
+      "headsign": "RBWH station",
+      "route": "M2",
+      "scheduled": "12:21",
+      "service_type": "RBWH - UQ Lakes via City"
+    }
+  ],
+  "p2_label": "Platform 2 - RBWH, Carseldine, Chermside, Bracken Ridge",
+  "stop_ids": [
+    "884",
+    "889"
+  ],
+  "updated": "12:00:54"
+}
